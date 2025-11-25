@@ -1,0 +1,228 @@
+import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {  
+  Wallet as WalletIcon,
+  Plus,
+  FileText,
+  MapPin,
+  History,
+  Shield,
+  ArrowLeft
+} from "lucide-react";
+import { FundWalletDialog } from "@/components/fund-wallet-dialog";
+import { OrderTestDialog } from "@/components/order-test-dialog";
+import { AssessmentCodeCard } from "@/components/assessment-code-card";
+import { TestResultCard } from "@/components/test-result-card";
+import { mockUser, mockWallet, mockAssessmentCodes, mockTestResults } from "@/lib/mock-data";
+
+export default function PatientHome() {
+  const [showFundWallet, setShowFundWallet] = useState(false);
+  const [showOrderTest, setShowOrderTest] = useState(false);
+
+  const user = mockUser;
+  const wallet = mockWallet;
+  const walletLoading = false;
+  const codes = mockAssessmentCodes;
+  const codesLoading = false;
+  const results = mockTestResults;
+  const resultsLoading = false;
+
+  const activeCode = codes.find(c => c.status === 'pending');
+  const newResults = results.filter(r => !r.viewed);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b bg-card">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Shield className="h-8 w-8 text-primary" />
+              <div>
+                <h1 className="text-xl font-bold">PriveScreen</h1>
+                <Badge variant="secondary" className="text-xs" data-testid="badge-role">Patient</Badge>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" data-testid="button-back" asChild>
+                <a href="/">
+                  <ArrowLeft className="h-5 w-5" />
+                </a>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8 max-w-7xl">
+        <div className="mb-8">
+          <h2 className="text-3xl font-semibold mb-2">Welcome back, {user.firstName || 'Patient'}</h2>
+          <p className="text-muted-foreground">Your private sexual health dashboard</p>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6 mb-8">
+          <Card className="lg:col-span-1">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
+              <WalletIcon className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              {walletLoading ? (
+                <Skeleton className="h-10 w-32" />
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-3xl font-bold" data-testid="text-balance">
+                    ₦{wallet?.balance || '0.00'}
+                  </div>
+                  <Button 
+                    onClick={() => setShowFundWallet(true)} 
+                    className="w-full"
+                    data-testid="button-fund-wallet"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Fund Wallet
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="lg:col-span-2">
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+              <CardDescription>Get started with sexual health testing</CardDescription>
+            </CardHeader>
+            <CardContent className="grid sm:grid-cols-3 gap-4">
+              <Button 
+                variant="outline" 
+                className="h-auto py-6 flex-col gap-2"
+                onClick={() => setShowOrderTest(true)}
+                data-testid="button-order-test"
+              >
+                <FileText className="h-6 w-6" />
+                <span className="text-sm">Order Test</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-auto py-6 flex-col gap-2"
+                asChild
+                data-testid="button-find-center"
+              >
+                <a href="/centers">
+                  <MapPin className="h-6 w-6" />
+                  <span className="text-sm">Find Center</span>
+                </a>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-auto py-6 flex-col gap-2"
+                asChild
+                data-testid="button-history"
+              >
+                <a href="/history">
+                  <History className="h-6 w-6" />
+                  <span className="text-sm">View History</span>
+                </a>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+
+        {newResults.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">New Test Results</h3>
+              <Badge variant="destructive" data-testid="badge-new-results">{newResults.length} New</Badge>
+            </div>
+            <div className="grid md:grid-cols-2 gap-4">
+              {newResults.map((result) => (
+                <TestResultCard key={result.id} result={result} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeCode && (
+          <div className="mb-8">
+            <h3 className="text-xl font-semibold mb-4">Active Assessment Code</h3>
+            <AssessmentCodeCard code={activeCode} />
+          </div>
+        )}
+
+        <div className="grid md:grid-cols-2 gap-8">
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">My Assessment Codes</h3>
+              {codes.length > 0 && (
+                <Badge variant="secondary" data-testid="badge-codes-count">{codes.length}</Badge>
+              )}
+            </div>
+            {codesLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ) : codes.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No assessment codes yet</p>
+                  <p className="text-sm">Order a test to get started</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {codes.slice(0, 3).map((code) => (
+                  <AssessmentCodeCard key={code.id} code={code} compact />
+                ))}
+                {codes.length > 3 && (
+                  <Button variant="outline" className="w-full" asChild data-testid="button-view-all-codes">
+                    <a href="/codes">View All Codes</a>
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Recent Results</h3>
+              {results.length > 0 && (
+                <Badge variant="secondary" data-testid="badge-results-count">{results.length}</Badge>
+              )}
+            </div>
+            {resultsLoading ? (
+              <div className="space-y-4">
+                <Skeleton className="h-32 w-full" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            ) : results.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center text-muted-foreground">
+                  <Shield className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No test results yet</p>
+                  <p className="text-sm">Your anonymous results will appear here</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {results.slice(0, 3).map((result) => (
+                  <TestResultCard key={result.id} result={result} compact />
+                ))}
+                {results.length > 3 && (
+                  <Button variant="outline" className="w-full" asChild data-testid="button-view-all-results">
+                    <a href="/results">View All Results</a>
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
+
+      <FundWalletDialog open={showFundWallet} onOpenChange={setShowFundWallet} />
+      <OrderTestDialog open={showOrderTest} onOpenChange={setShowOrderTest} />
+    </div>
+  );
+}
