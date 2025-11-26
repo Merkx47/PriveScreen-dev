@@ -8,27 +8,27 @@ import { PriveScreenLogo } from "@/components/logo";
 // Nigerian medical professionals slideshow images
 const heroImages = [
   {
-    url: "https://images.pexels.com/photos/5452201/pexels-photo-5452201.jpeg?auto=compress&cs=tinysrgb&w=1920",
-    alt: "Nigerian female doctor with stethoscope",
+    url: "/hero-1.jpg",
+    alt: "Nigerian medical professional",
     caption: "Professional Healthcare You Can Trust"
   },
   {
-    url: "https://images.pexels.com/photos/5452293/pexels-photo-5452293.jpeg?auto=compress&cs=tinysrgb&w=1920",
-    alt: "African doctor consulting patient",
+    url: "/hero-2.jpg",
+    alt: "Nigerian healthcare team",
     caption: "Compassionate Care, Complete Privacy"
   },
   {
-    url: "https://images.pexels.com/photos/5452268/pexels-photo-5452268.jpeg?auto=compress&cs=tinysrgb&w=1920",
-    alt: "Nigerian medical laboratory technician",
+    url: "/hero-3.jpg",
+    alt: "Nigerian diagnostic center",
     caption: "State-of-the-Art Diagnostic Services"
   },
   {
-    url: "https://images.pexels.com/photos/5452255/pexels-photo-5452255.jpeg?auto=compress&cs=tinysrgb&w=1920",
+    url: "/hero-4.jpeg",
     alt: "Nigerian healthcare professional",
     caption: "Your Health, Your Control"
   },
   {
-    url: "https://images.pexels.com/photos/5452196/pexels-photo-5452196.jpeg?auto=compress&cs=tinysrgb&w=1920",
+    url: "/hero-5.jpg",
     alt: "Nigerian medical team",
     caption: "Expert Teams Across Nigeria"
   }
