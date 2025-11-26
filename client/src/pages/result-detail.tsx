@@ -1,20 +1,43 @@
-import { useState } from "react";
-import { useRoute } from "wouter";
+import { useState, useEffect } from "react";
+import { useRoute, useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Download, Share2, ArrowLeft, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
-import { mockTestResults, mockDiagnosticCenters, mockTestStandards } from "@/lib/mock-data";
+import { Download, Share2, ArrowLeft, CheckCircle2, AlertCircle, XCircle, Eye, Shield, Lock } from "lucide-react";
+import { mockTestResults, mockDiagnosticCenters, mockTestStandards, mockAssessmentCodes } from "@/lib/mock-data";
+import { PriveScreenLogo } from "@/components/logo";
 import { ShareResultDialog } from "@/components/share-result-dialog";
 import { format } from "date-fns";
 
 export default function ResultDetail() {
   const [, params] = useRoute("/results/:id");
+  const searchString = useSearch();
   const [showShare, setShowShare] = useState(false);
-  
+  const [hasViewedResults, setHasViewedResults] = useState(false);
+
+  // Check if viewing as sponsor (from URL query param)
+  const isSponsorView = searchString.includes("view=sponsor");
+
   const result = mockTestResults.find(r => r.id === params?.id);
   const center = result ? mockDiagnosticCenters.find(c => c.id === result.diagnosticCenterId) : null;
   const testStandard = result ? mockTestStandards.find(t => t.id === result.testStandardId) : null;
+
+  // Find if this result was from a sponsored test
+  const assessmentCode = result ? mockAssessmentCodes.find(c => c.id === result.assessmentCodeId) : null;
+  const sponsorInfo = assessmentCode && assessmentCode.sponsorType !== "self" ? {
+    name: assessmentCode.sponsorType === "employer" ? "Your Employer" : "Anonymous Sponsor",
+    type: assessmentCode.sponsorType,
+  } : undefined;
+
+  // Mark results as viewed when patient opens this page (Phase 5: Patient views results first)
+  useEffect(() => {
+    if (result && !result.viewed) {
+      // In a real app, this would call an API to mark as viewed
+      setHasViewedResults(true);
+    } else if (result?.viewed) {
+      setHasViewedResults(true);
+    }
+  }, [result]);
 
   if (!result) {
     return (
@@ -67,15 +90,17 @@ export default function ResultDetail() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild data-testid="button-back">
-              <a href="/">
+              <a href={isSponsorView ? "/sponsor" : "/patient"}>
                 <ArrowLeft className="h-5 w-5" />
               </a>
             </Button>
             <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
+              <PriveScreenLogo size={32} />
               <div>
-                <h1 className="text-xl font-bold">Test Results</h1>
-                <p className="text-sm text-muted-foreground">Anonymous Results Vault</p>
+                <h1 className="text-xl font-bold">{isSponsorView ? "Shared Results" : "Test Results"}</h1>
+                <p className="text-sm text-muted-foreground">
+                  {isSponsorView ? "Anonymous View (Read Only)" : "Anonymous Results Vault"}
+                </p>
               </div>
             </div>
           </div>
@@ -83,6 +108,48 @@ export default function ResultDetail() {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
+        {/* Sponsor View Banner */}
+        {isSponsorView && (
+          <Card className="mb-6 border-muted bg-muted/30">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Lock className="h-6 w-6 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-muted-foreground mb-1">Anonymous Results View</h3>
+                  <p className="text-sm text-muted-foreground">
+                    You are viewing shared results with the patient's consent.
+                    Personal information has been removed to protect privacy.
+                    This view is read-only — you cannot download or share these results.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Consent Notice Banner - Only for patients */}
+        {!isSponsorView && !result.viewed && (
+          <Card className="mb-6 border-primary bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <Eye className="h-6 w-6 text-primary flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-primary mb-1">Your Results Require Your Consent to Share</h3>
+                  <p className="text-sm text-muted-foreground">
+                    These results are private and belong to you.
+                    {sponsorInfo ? (
+                      <> Your sponsor ({sponsorInfo.type}) has been notified that your test is complete,
+                      but <strong>they cannot see these results unless you explicitly grant consent</strong>.</>
+                    ) : (
+                      <> No one else can view your medical information without your explicit consent.</>
+                    )}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between mb-2">
@@ -124,16 +191,19 @@ export default function ResultDetail() {
               </div>
             </div>
 
-            <div className="flex gap-2 flex-wrap">
-              <Button onClick={() => setShowShare(true)} data-testid="button-share">
-                <Share2 className="h-4 w-4 mr-2" />
-                Share Results
-              </Button>
-              <Button variant="outline" data-testid="button-download">
-                <Download className="h-4 w-4 mr-2" />
-                Download PDF
-              </Button>
-            </div>
+            {/* Only show share/download for patients, not sponsors */}
+            {!isSponsorView && (
+              <div className="flex gap-2 flex-wrap">
+                <Button onClick={() => setShowShare(true)} data-testid="button-share">
+                  <Share2 className="h-4 w-4 mr-2" />
+                  Share Results
+                </Button>
+                <Button variant="outline" data-testid="button-download">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -177,26 +247,32 @@ export default function ResultDetail() {
           </CardContent>
         </Card>
 
-        <Card className="mt-6 bg-muted/30">
-          <CardContent className="pt-6">
-            <div className="flex gap-3">
-              <Shield className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <p className="font-medium mb-1">Privacy Notice</p>
-                <p className="text-muted-foreground">
-                  This anonymous report contains no patient names. Results are stored securely and only you can share them.
-                  The QR code or Test ID can be used to verify authenticity with healthcare providers.
-                </p>
+        {/* Privacy footer - only for patients */}
+        {!isSponsorView && (
+          <Card className="mt-6 bg-primary/5 border-primary/20">
+            <CardContent className="pt-6">
+              <div className="flex gap-3">
+                <Shield className="h-5 w-5 text-primary flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium mb-2 text-primary">Your Results, Your Control</p>
+                  <p className="text-muted-foreground mb-2">
+                    <strong>You're viewing your personal results.</strong> Anyone else will only see an anonymous version of this result — and <em>only when you give consent</em>.
+                  </p>
+                  <p className="text-muted-foreground">
+                    No one — not sponsors, employers, or partners — can access your medical information without your explicit permission. You decide who sees what, and for how long.
+                  </p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </main>
 
-      <ShareResultDialog 
-        open={showShare} 
+      <ShareResultDialog
+        open={showShare}
         onOpenChange={setShowShare}
         resultId={result.id}
+        sponsorInfo={sponsorInfo}
       />
     </div>
   );

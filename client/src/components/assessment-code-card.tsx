@@ -1,8 +1,10 @@
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Copy, QrCode, CheckCircle2, Clock, XCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { QRCodeDialog } from "@/components/qr-code-dialog";
 import type { AssessmentCode } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 
@@ -13,6 +15,7 @@ interface AssessmentCodeCardProps {
 
 export function AssessmentCodeCard({ code, compact = false }: AssessmentCodeCardProps) {
   const { toast } = useToast();
+  const [showQR, setShowQR] = useState(false);
 
   const copyCode = () => {
     navigator.clipboard.writeText(code.code);
@@ -85,7 +88,12 @@ export function AssessmentCodeCard({ code, compact = false }: AssessmentCodeCard
               <Copy className="h-4 w-4 mr-2" />
               Copy Code
             </Button>
-            <Button variant="outline" size="sm" data-testid="button-qr">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowQR(true)}
+              data-testid="button-qr"
+            >
               <QrCode className="h-4 w-4 mr-2" />
               Show QR
             </Button>
@@ -113,6 +121,13 @@ export function AssessmentCodeCard({ code, compact = false }: AssessmentCodeCard
           </Button>
         )}
       </CardContent>
+
+      <QRCodeDialog
+        open={showQR}
+        onOpenChange={setShowQR}
+        code={code.code}
+        patientName={code.patientName}
+      />
     </Card>
   );
 }

@@ -3,13 +3,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Search, CheckCircle2, Upload, ArrowLeft } from "lucide-react";
+import { Search, CheckCircle2, Upload, ArrowLeft, Settings } from "lucide-react";
 import { ValidateCodeDialog } from "@/components/validate-code-dialog";
+import { CenterPricingDialog } from "@/components/center-pricing-dialog";
+import { PriveScreenLogo } from "@/components/logo";
 import { mockCenterTests } from "@/lib/mock-data";
 
 export default function CenterHome() {
   const [codeInput, setCodeInput] = useState("");
   const [showValidate, setShowValidate] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
   const recentTests = mockCenterTests;
 
   const handleValidate = () => {
@@ -23,7 +26,7 @@ export default function CenterHome() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
+              <PriveScreenLogo size={32} />
               <div>
                 <h1 className="text-xl font-bold">Lifebridge Medical Diagnostics</h1>
                 <Badge variant="secondary" className="text-xs" data-testid="badge-role">Diagnostic Center</Badge>
@@ -47,7 +50,7 @@ export default function CenterHome() {
           <p className="text-muted-foreground">Validate assessment codes and upload test results</p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader>
               <CardTitle>Validate Assessment Code</CardTitle>
@@ -65,7 +68,7 @@ export default function CenterHome() {
                   maxLength={12}
                   data-testid="input-assessment-code"
                 />
-                <Button 
+                <Button
                   onClick={handleValidate}
                   disabled={codeInput.length !== 12}
                   data-testid="button-validate-code"
@@ -88,10 +91,42 @@ export default function CenterHome() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button variant="outline" className="w-full" data-testid="button-upload-results">
-                <Upload className="h-4 w-4 mr-2" />
-                Upload New Results
+              <Button
+                className="w-full"
+                data-testid="button-upload-results"
+                asChild
+              >
+                <a href="/center/upload">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload New Results
+                </a>
               </Button>
+              <p className="text-sm text-muted-foreground mt-3">
+                Full-screen form for entering test results with document upload
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Manage Services</CardTitle>
+              <CardDescription>
+                Set your tests, packages and prices
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="w-full"
+                data-testid="button-manage-services"
+                onClick={() => setShowPricing(true)}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Configure Pricing
+              </Button>
+              <p className="text-sm text-muted-foreground mt-3">
+                Customize your test offerings and set competitive prices
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -140,10 +175,15 @@ export default function CenterHome() {
         </Card>
       </main>
 
-      <ValidateCodeDialog 
-        open={showValidate} 
+      <ValidateCodeDialog
+        open={showValidate}
         onOpenChange={setShowValidate}
         code={codeInput}
+      />
+
+      <CenterPricingDialog
+        open={showPricing}
+        onOpenChange={setShowPricing}
       />
     </div>
   );

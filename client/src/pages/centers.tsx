@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useState, useEffect, useRef } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Shield, MapPin, Phone, Mail, Clock, Star, Navigation, ArrowLeft } from "lucide-react";
+import { MapPin, Phone, Mail, Clock, Star, Navigation, ArrowLeft, MessageSquarePlus } from "lucide-react";
 import { mockDiagnosticCenters } from "@/lib/mock-data";
+import { RateCenterDialog } from "@/components/rate-center-dialog";
+import { PriveScreenLogo } from "@/components/logo";
 import type { DiagnosticCenter } from "@shared/schema";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -18,10 +21,62 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 });
 
+// Custom marker icon for selected center
+const selectedIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+const defaultIcon = new L.Icon({
+  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41]
+});
+
+// Component to handle map view changes
+function MapController({ center, zoom }: { center: [number, number] | null; zoom?: number }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (center) {
+      map.flyTo(center, zoom || 15, {
+        duration: 1
+      });
+    }
+  }, [center, zoom, map]);
+
+  return null;
+}
+
 export default function Centers() {
+  const searchString = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCenter, setSelectedCenter] = useState<DiagnosticCenter | null>(null);
   const [centers] = useState<DiagnosticCenter[]>(mockDiagnosticCenters);
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const markerRefs = useRef<{ [key: string]: L.Marker | null }>({});
+  const [showRateDialog, setShowRateDialog] = useState(false);
+  const [centerToRate, setCenterToRate] = useState<DiagnosticCenter | null>(null);
+
+  // Determine back destination based on where user came from
+  const getBackDestination = () => {
+    if (searchString.includes("from=patient")) return "/patient";
+    if (searchString.includes("from=sponsor")) return "/sponsor";
+    return "/";
+  };
+
+  const handleRateCenter = (center: DiagnosticCenter, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCenterToRate(center);
+    setShowRateDialog(true);
+  };
 
   const filteredCenters = centers.filter((center) =>
     center.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -31,18 +86,33 @@ export default function Centers() {
 
   const lagosCenter = { lat: 6.5244, lng: 3.3792 };
 
+  // Handle center selection - pan map and open popup
+  const handleSelectCenter = (center: DiagnosticCenter) => {
+    setSelectedCenter(center);
+    if (center.latitude && center.longitude) {
+      setMapCenter([parseFloat(center.latitude), parseFloat(center.longitude)]);
+      // Open the popup for this marker after a short delay
+      setTimeout(() => {
+        const marker = markerRefs.current[center.id];
+        if (marker) {
+          marker.openPopup();
+        }
+      }, 500);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" asChild data-testid="button-back">
-              <a href="/">
+              <a href={getBackDestination()}>
                 <ArrowLeft className="h-5 w-5" />
               </a>
             </Button>
             <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
+              <PriveScreenLogo size={32} />
               <div>
                 <h1 className="text-xl font-bold">Find Diagnostic Center</h1>
                 <p className="text-sm text-muted-foreground">Verified centers in Lagos, Nigeria</p>
@@ -70,14 +140,14 @@ export default function Centers() {
               <Badge variant="secondary" data-testid="badge-count">{filteredCenters.length} centers</Badge>
             </div>
 
-            <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
+            <div className="space-y-4 max-h-[600px] overflow-y-auto p-1">
               {filteredCenters.map((center) => (
                 <Card
                   key={center.id}
                   className={`cursor-pointer transition-all hover-elevate ${
                     selectedCenter?.id === center.id ? 'ring-2 ring-primary' : ''
                   }`}
-                  onClick={() => setSelectedCenter(center)}
+                  onClick={() => handleSelectCenter(center)}
                   data-testid={`card-center-${center.id}`}
                 >
                   <CardHeader className="pb-3">
@@ -116,15 +186,34 @@ export default function Centers() {
                         <span>{center.hours}</span>
                       </div>
                     )}
-                    <div className="pt-2">
+                    <div className="pt-2 flex gap-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="w-full"
+                        className="flex-1"
                         data-testid={`button-directions-${center.id}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (center.latitude && center.longitude) {
+                            window.open(
+                              `https://www.google.com/maps/dir/?api=1&destination=${center.latitude},${center.longitude}`,
+                              '_blank'
+                            );
+                          }
+                        }}
                       >
                         <Navigation className="h-4 w-4 mr-2" />
-                        Get Directions
+                        Directions
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                        data-testid={`button-rate-${center.id}`}
+                        onClick={(e) => handleRateCenter(center, e)}
+                      >
+                        <MessageSquarePlus className="h-4 w-4 mr-2" />
+                        Rate
                       </Button>
                     </div>
                   </CardContent>
@@ -144,24 +233,43 @@ export default function Centers() {
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
+              <MapController center={mapCenter} />
               {filteredCenters.map((center) => (
                 center.latitude && center.longitude && (
                   <Marker
                     key={center.id}
                     position={[parseFloat(center.latitude), parseFloat(center.longitude)]}
+                    icon={selectedCenter?.id === center.id ? selectedIcon : defaultIcon}
+                    ref={(ref) => {
+                      markerRefs.current[center.id] = ref;
+                    }}
                     eventHandlers={{
-                      click: () => setSelectedCenter(center),
+                      click: () => handleSelectCenter(center),
                     }}
                   >
                     <Popup>
-                      <div className="p-2">
+                      <div className="p-2 min-w-[200px]">
                         <h3 className="font-semibold mb-1">{center.name}</h3>
-                        <p className="text-sm text-muted-foreground mb-2">{center.address}</p>
+                        <p className="text-sm text-gray-600 mb-2">{center.address}</p>
                         <div className="flex items-center gap-1 mb-2">
                           <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
                           <span className="text-xs font-medium">{center.rating}</span>
                         </div>
-                        <p className="text-xs">{center.phone}</p>
+                        <p className="text-xs text-gray-500 mb-2">{center.phone}</p>
+                        <Button
+                          size="sm"
+                          className="w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(
+                              `https://www.google.com/maps/dir/?api=1&destination=${center.latitude},${center.longitude}`,
+                              '_blank'
+                            );
+                          }}
+                        >
+                          <Navigation className="h-3 w-3 mr-1" />
+                          Get Directions
+                        </Button>
                       </div>
                     </Popup>
                   </Marker>
@@ -171,6 +279,16 @@ export default function Centers() {
           </div>
         </div>
       </main>
+
+      {/* Rate Center Dialog */}
+      {centerToRate && (
+        <RateCenterDialog
+          open={showRateDialog}
+          onOpenChange={setShowRateDialog}
+          centerName={centerToRate.name}
+          centerId={centerToRate.id}
+        />
+      )}
     </div>
   );
 }

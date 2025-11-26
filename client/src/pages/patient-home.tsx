@@ -2,17 +2,24 @@ import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {  
+import { Skeleton } from "@/components/ui/skeleton";
+import {
   Wallet as WalletIcon,
   Plus,
   FileText,
   MapPin,
   History,
-  Shield,
-  ArrowLeft
+  ArrowLeft,
+  Gift,
+  Crown,
+  Home,
+  Clock,
+  CheckCircle2
 } from "lucide-react";
 import { FundWalletDialog } from "@/components/fund-wallet-dialog";
+import { PriveScreenLogo } from "@/components/logo";
 import { OrderTestDialog } from "@/components/order-test-dialog";
+import { ActivateCodeDialog } from "@/components/activate-code-dialog";
 import { AssessmentCodeCard } from "@/components/assessment-code-card";
 import { TestResultCard } from "@/components/test-result-card";
 import { mockUser, mockWallet, mockAssessmentCodes, mockTestResults } from "@/lib/mock-data";
@@ -20,6 +27,7 @@ import { mockUser, mockWallet, mockAssessmentCodes, mockTestResults } from "@/li
 export default function PatientHome() {
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [showOrderTest, setShowOrderTest] = useState(false);
+  const [showActivateCode, setShowActivateCode] = useState(false);
 
   const user = mockUser;
   const wallet = mockWallet;
@@ -38,7 +46,7 @@ export default function PatientHome() {
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Shield className="h-8 w-8 text-primary" />
+              <PriveScreenLogo size={32} />
               <div>
                 <h1 className="text-xl font-bold">PriveScreen</h1>
                 <Badge variant="secondary" className="text-xs" data-testid="badge-role">Patient</Badge>
@@ -75,8 +83,8 @@ export default function PatientHome() {
                   <div className="text-3xl font-bold" data-testid="text-balance">
                     ₦{wallet?.balance || '0.00'}
                   </div>
-                  <Button 
-                    onClick={() => setShowFundWallet(true)} 
+                  <Button
+                    onClick={() => setShowFundWallet(true)}
                     className="w-full"
                     data-testid="button-fund-wallet"
                   >
@@ -93,9 +101,9 @@ export default function PatientHome() {
               <CardTitle>Quick Actions</CardTitle>
               <CardDescription>Get started with sexual health testing</CardDescription>
             </CardHeader>
-            <CardContent className="grid sm:grid-cols-3 gap-4">
-              <Button 
-                variant="outline" 
+            <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Button
+                variant="outline"
                 className="h-auto py-6 flex-col gap-2"
                 onClick={() => setShowOrderTest(true)}
                 data-testid="button-order-test"
@@ -103,19 +111,28 @@ export default function PatientHome() {
                 <FileText className="h-6 w-6" />
                 <span className="text-sm">Order Test</span>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex-col gap-2 border-primary/50 bg-primary/5"
+                onClick={() => setShowActivateCode(true)}
+                data-testid="button-activate-code"
+              >
+                <Gift className="h-6 w-6 text-primary" />
+                <span className="text-sm">Activate Code</span>
+              </Button>
+              <Button
+                variant="outline"
                 className="h-auto py-6 flex-col gap-2"
                 asChild
                 data-testid="button-find-center"
               >
-                <a href="/centers">
+                <a href="/centers?from=patient">
                   <MapPin className="h-6 w-6" />
                   <span className="text-sm">Find Center</span>
                 </a>
               </Button>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 className="h-auto py-6 flex-col gap-2"
                 asChild
                 data-testid="button-history"
@@ -128,6 +145,44 @@ export default function PatientHome() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Prime Service Banner */}
+        <Card className="mb-8 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 dark:border-amber-800">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-4">
+              <div className="p-3 rounded-full bg-amber-100 dark:bg-amber-900">
+                <Crown className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg mb-1 flex items-center gap-2">
+                  Prime Service
+                  <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">Premium</Badge>
+                </h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Get tested from the comfort of your home. Our certified phlebotomists come to you for sample collection with complete privacy.
+                </p>
+                <div className="flex flex-wrap gap-4 text-sm mb-4">
+                  <div className="flex items-center gap-2">
+                    <Home className="h-4 w-4 text-amber-600" />
+                    <span>Home Sample Collection</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-amber-600" />
+                    <span>Results in 12hrs</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-amber-600" />
+                    <span>100% Privacy</span>
+                  </div>
+                </div>
+                <Button variant="outline" className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900">
+                  <Crown className="h-4 w-4 mr-2" />
+                  Book Home Service
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {newResults.length > 0 && (
           <div className="mb-8">
@@ -200,7 +255,7 @@ export default function PatientHome() {
             ) : results.length === 0 ? (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
-                  <Shield className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <PriveScreenLogo size={48} className="mx-auto mb-3 opacity-50" />
                   <p>No test results yet</p>
                   <p className="text-sm">Your anonymous results will appear here</p>
                 </CardContent>
@@ -223,6 +278,7 @@ export default function PatientHome() {
 
       <FundWalletDialog open={showFundWallet} onOpenChange={setShowFundWallet} />
       <OrderTestDialog open={showOrderTest} onOpenChange={setShowOrderTest} />
+      <ActivateCodeDialog open={showActivateCode} onOpenChange={setShowActivateCode} />
     </div>
   );
 }

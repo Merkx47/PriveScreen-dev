@@ -3,7 +3,6 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2 } from "lucide-react";
@@ -17,7 +16,8 @@ interface PurchaseCodesDialogProps {
 
 export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogProps) {
   const { toast } = useToast();
-  const [recipientName, setRecipientName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [recipientContact, setRecipientContact] = useState("");
   const [testType, setTestType] = useState("");
   const [quantity, setQuantity] = useState("1");
@@ -26,7 +26,7 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
   const selectedTest = tests.find(t => t.id === testType);
 
   const handlePurchase = () => {
-    if (!recipientName || !recipientContact || !testType) {
+    if (!firstName || !lastName || !recipientContact || !testType) {
       toast({
         title: "Missing Information",
         description: "Please fill in all required fields",
@@ -40,7 +40,8 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
       description: `Assessment code sent to ${recipientContact}`,
     });
     onOpenChange(false);
-    setRecipientName("");
+    setFirstName("");
+    setLastName("");
     setRecipientContact("");
     setTestType("");
     setQuantity("1");
@@ -58,15 +59,28 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
 
         <div className="space-y-6">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="recipientName">Recipient Name</Label>
-              <Input
-                id="recipientName"
-                placeholder="John Doe or Employee #1234"
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
-                data-testid="input-recipient-name"
-              />
+            {/* First Name and Last Name fields */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input
+                  id="firstName"
+                  placeholder="John"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  data-testid="input-first-name"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input
+                  id="lastName"
+                  placeholder="Doe"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  data-testid="input-last-name"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -153,8 +167,8 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
             </ul>
           </div>
 
-          <Button 
-            onClick={handlePurchase} 
+          <Button
+            onClick={handlePurchase}
             className="w-full"
             disabled={!testType}
             data-testid="button-confirm-purchase"

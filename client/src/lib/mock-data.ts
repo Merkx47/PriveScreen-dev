@@ -303,6 +303,11 @@ export const mockSponsoredCodes = [
     status: "completed" as const,
     sentAt: new Date("2024-11-05"),
     completedAt: new Date("2024-11-10"),
+    // Patient chose to share results with sponsor
+    sharedWithSponsor: true,
+    shareExpiresAt: new Date("2024-12-10"),
+    overallStatus: "All Normal" as const,
+    resultId: "result-1", // Link to the actual result
   },
   {
     id: "sponsored-2",
@@ -313,6 +318,19 @@ export const mockSponsoredCodes = [
     status: "pending" as const,
     sentAt: new Date("2024-11-15"),
     completedAt: undefined,
+    sharedWithSponsor: false,
+  },
+  {
+    id: "sponsored-3",
+    recipientName: "Emeka Okafor",
+    recipientContact: "+234 807 123 4567",
+    testType: "Basic STI Check",
+    code: "PSN9R5T1M8K2",
+    status: "completed" as const,
+    sentAt: new Date("2024-11-01"),
+    completedAt: new Date("2024-11-08"),
+    // Patient chose NOT to share - sponsor only knows it's complete
+    sharedWithSponsor: false,
   },
 ];
 

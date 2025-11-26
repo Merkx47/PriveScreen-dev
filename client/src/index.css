@@ -175,6 +175,50 @@
   }
 }
 
+/* Leaflet Map Z-Index Fixes */
+.leaflet-container {
+  z-index: 1 !important;
+}
+
+.leaflet-pane,
+.leaflet-tile,
+.leaflet-marker-icon,
+.leaflet-marker-shadow,
+.leaflet-tile-container,
+.leaflet-map-pane,
+.leaflet-overlay-pane,
+.leaflet-shadow-pane,
+.leaflet-marker-pane,
+.leaflet-tooltip-pane,
+.leaflet-popup-pane {
+  z-index: 1 !important;
+}
+
+.leaflet-control {
+  z-index: 10 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 10 !important;
+}
+
+/* Ensure dialogs and overlays appear above everything */
+[data-radix-dialog-overlay],
+[data-radix-alert-dialog-overlay] {
+  z-index: 9998 !important;
+}
+
+[data-radix-dialog-content],
+[data-radix-alert-dialog-content] {
+  z-index: 9999 !important;
+}
+
+/* Fix for dialog backdrop to cover map completely */
+.fixed.inset-0.bg-black\/50 {
+  z-index: 9997 !important;
+}
+
 /**
  * Using the elevate system.
  * Automatic contrast adjustment.
