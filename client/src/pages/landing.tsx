@@ -5,31 +5,31 @@ import { Lock, Heart, Users, CheckCircle2, Globe, ChevronLeft, ChevronRight } fr
 import { LanguageSelector } from "@/lib/i18n";
 import { PriveScreenLogo } from "@/components/logo";
 
-// African medical professionals slideshow images
+// Nigerian medical professionals slideshow images
 const heroImages = [
   {
-    url: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?w=1920&q=80",
-    alt: "Black male doctor with stethoscope",
+    url: "https://images.pexels.com/photos/5452201/pexels-photo-5452201.jpeg?auto=compress&cs=tinysrgb&w=1920",
+    alt: "Nigerian female doctor with stethoscope",
     caption: "Professional Healthcare You Can Trust"
   },
   {
-    url: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=1920&q=80",
-    alt: "Black female doctor smiling confidently",
+    url: "https://images.pexels.com/photos/5452293/pexels-photo-5452293.jpeg?auto=compress&cs=tinysrgb&w=1920",
+    alt: "African doctor consulting patient",
     caption: "Compassionate Care, Complete Privacy"
   },
   {
-    url: "https://images.unsplash.com/photo-1579684385127-1ef15d508118?w=1920&q=80",
-    alt: "African medical professional in lab",
+    url: "https://images.pexels.com/photos/5452268/pexels-photo-5452268.jpeg?auto=compress&cs=tinysrgb&w=1920",
+    alt: "Nigerian medical laboratory technician",
     caption: "State-of-the-Art Diagnostic Services"
   },
   {
-    url: "https://images.unsplash.com/photo-1666214280557-f1b5022eb634?w=1920&q=80",
-    alt: "Black doctor consulting with patient",
+    url: "https://images.pexels.com/photos/5452255/pexels-photo-5452255.jpeg?auto=compress&cs=tinysrgb&w=1920",
+    alt: "Nigerian healthcare professional",
     caption: "Your Health, Your Control"
   },
   {
-    url: "https://images.unsplash.com/photo-1651008376811-b90baee60c1f?w=1920&q=80",
-    alt: "African healthcare team",
+    url: "https://images.pexels.com/photos/5452196/pexels-photo-5452196.jpeg?auto=compress&cs=tinysrgb&w=1920",
+    alt: "Nigerian medical team",
     caption: "Expert Teams Across Nigeria"
   }
 ];
@@ -60,14 +60,14 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-3 md:py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <PriveScreenLogo size={36} />
-            <h1 className="text-2xl font-bold">PriveScreen</h1>
+            <PriveScreenLogo size={32} className="md:w-9 md:h-9" />
+            <h1 className="text-xl md:text-2xl font-bold">PriveScreen</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 md:gap-4">
             <LanguageSelector />
-            <div className="flex gap-2">
+            <div className="hidden sm:flex gap-2">
               <Button variant="outline" size="sm" asChild data-testid="button-patient">
                 <a href="/auth/patient">Patient</a>
               </Button>
