@@ -1,3 +1,4 @@
+import * as React from "react";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,12 +13,17 @@ import {
   Eye,
   Wallet as WalletIcon,
   Crown,
-  Home
+  Home,
+  Gift,
+  Building2,
+  XCircle,
 } from "lucide-react";
 import { PurchaseCodesDialog } from "@/components/purchase-codes-dialog";
 import { FundWalletDialog } from "@/components/fund-wallet-dialog";
 import { PriveScreenLogo } from "@/components/logo";
-import { mockSponsoredCodes, mockWallet, mockDiagnosticCenters } from "@/lib/mock-data";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { useToast } from "@/hooks/use-toast";
+import { mockSponsoredCodes, mockWallet, mockDiagnosticCenters, mockSponsorTestRequests, mockTestStandards } from "@/lib/mock-data";
 
 // Helper to hash name: FirstName L***
 function hashName(fullName: string): string {
@@ -29,9 +35,19 @@ function hashName(fullName: string): string {
 }
 
 export default function SponsorHome() {
+  const { toast } = useToast();
   const [showPurchase, setShowPurchase] = useState(false);
   const [showFundWallet, setShowFundWallet] = useState(false);
+  const [declinedRequests, setDeclinedRequests] = useState<string[]>([]);
   const sponsoredCodes = mockSponsoredCodes;
+
+  const handleDeclineRequest = (requestId: string, patientName: string) => {
+    setDeclinedRequests(prev => [...prev, requestId]);
+    toast({
+      title: "Request Declined",
+      description: `You have declined the sponsorship request from ${hashName(patientName)}. They will be notified.`,
+    });
+  };
   const wallet = mockWallet;
   const walletLoading = false;
 
@@ -59,6 +75,7 @@ export default function SponsorHome() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Button variant="ghost" size="icon" data-testid="button-back" asChild>
                 <a href="/">
                   <ArrowLeft className="h-5 w-5" />
@@ -175,9 +192,11 @@ export default function SponsorHome() {
                     <span>Dedicated Support</span>
                   </div>
                 </div>
-                <Button variant="outline" className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900">
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade to Prime
+                <Button variant="outline" className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900" asChild>
+                  <a href="/get-prime">
+                    <Crown className="h-4 w-4 mr-2" />
+                    Upgrade to Prime
+                  </a>
                 </Button>
               </div>
             </div>
@@ -201,6 +220,105 @@ export default function SponsorHome() {
             </Button>
           </CardContent>
         </Card>
+
+        {/* Incoming Sponsorship Requests from Patients */}
+        {mockSponsorTestRequests.filter(r => r.status === 'pending' && !declinedRequests.includes(r.id)).length > 0 && (
+          <Card className="mb-8 border-blue-200 dark:border-blue-800">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Gift className="h-5 w-5 text-blue-600" />
+                    Incoming Sponsorship Requests
+                  </CardTitle>
+                  <CardDescription>
+                    Patients have requested that you sponsor their tests
+                  </CardDescription>
+                </div>
+                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
+                  {mockSponsorTestRequests.filter(r => r.status === 'pending' && !declinedRequests.includes(r.id)).length} Pending
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {mockSponsorTestRequests.filter(r => r.status === 'pending' && !declinedRequests.includes(r.id)).map((request) => {
+                  const center = mockDiagnosticCenters.find(c => c.id === request.centerId);
+                  const testPkg = mockTestStandards.find(t => t.id === request.testPackageId);
+                  return (
+                    <div
+                      key={request.id}
+                      className="p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/20"
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold">{hashName(request.patientName)}</h3>
+                            <Badge variant="outline" className="text-blue-600 border-blue-300">
+                              Awaiting Response
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground font-mono">
+                            Code: {request.code}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-primary">₦{parseFloat(request.testPrice).toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground">Requested amount</p>
+                        </div>
+                      </div>
+
+                      <div className="grid sm:grid-cols-2 gap-4 text-sm mb-4">
+                        <div className="flex items-start gap-2">
+                          <Building2 className="h-4 w-4 text-muted-foreground mt-0.5" />
+                          <div>
+                            <p className="text-muted-foreground">Center</p>
+                            <p className="font-medium">{center?.name}</p>
+                          </div>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Test Package</p>
+                          <p className="font-medium">{testPkg?.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Requested</p>
+                          <p>{request.createdAt.toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground">Expires</p>
+                          <p>{request.expiresAt.toLocaleDateString()}</p>
+                        </div>
+                      </div>
+
+                      {request.message && (
+                        <div className="p-3 bg-background rounded border mb-4">
+                          <p className="text-sm italic text-muted-foreground">"{request.message}"</p>
+                        </div>
+                      )}
+
+                      <div className="flex gap-3">
+                        <Button size="sm" asChild>
+                          <a href={`/sponsor-request/${request.code}`}>
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Review & Accept
+                          </a>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleDeclineRequest(request.id, request.patientName)}
+                        >
+                          <XCircle className="h-4 w-4 mr-2" />
+                          Decline
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

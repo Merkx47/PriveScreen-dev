@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Lock, Heart, Users, CheckCircle2, Globe, ChevronLeft, ChevronRight } from "lucide-react";
 import { LanguageSelector } from "@/lib/i18n";
 import { PriveScreenLogo } from "@/components/logo";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // Nigerian medical professionals slideshow images
 const heroImages = [
@@ -66,6 +67,7 @@ export default function Landing() {
             <h1 className="text-xl md:text-2xl font-bold">PriveScreen</h1>
           </div>
           <div className="flex items-center gap-2 md:gap-4">
+            <ThemeToggle />
             <LanguageSelector />
             <div className="hidden sm:flex gap-2">
               <Button variant="outline" size="sm" asChild data-testid="button-patient">

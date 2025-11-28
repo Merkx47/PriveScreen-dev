@@ -79,6 +79,9 @@ export const testStandards = pgTable("test_standards", {
   sampleType: varchar("sample_type"),
   turnaroundTime: varchar("turnaround_time"),
   active: boolean("active").notNull().default(true),
+  isDefault: boolean("is_default").default(false),
+  hasWindowPeriodInfo: boolean("has_window_period_info").default(false),
+  windowPeriodDays: integer("window_period_days"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -165,7 +168,9 @@ export const testResults = pgTable("test_results", {
   results: jsonb("results").notNull().$type<{
     parameter: string;
     value: string;
+    unit?: string;
     referenceRange: string;
+    interpretation?: string;
     status: 'normal' | 'abnormal' | 'borderline';
   }[]>(),
   viewed: boolean("viewed").notNull().default(false),

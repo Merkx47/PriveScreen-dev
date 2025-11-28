@@ -1,3 +1,4 @@
+import * as React from "react";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,20 +15,25 @@ import {
   Crown,
   Home,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  BookOpen,
+  HandCoins
 } from "lucide-react";
 import { FundWalletDialog } from "@/components/fund-wallet-dialog";
 import { PriveScreenLogo } from "@/components/logo";
 import { OrderTestDialog } from "@/components/order-test-dialog";
 import { ActivateCodeDialog } from "@/components/activate-code-dialog";
+import { RequestSponsorDialog } from "@/components/request-sponsor-dialog";
 import { AssessmentCodeCard } from "@/components/assessment-code-card";
 import { TestResultCard } from "@/components/test-result-card";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { mockUser, mockWallet, mockAssessmentCodes, mockTestResults } from "@/lib/mock-data";
 
 export default function PatientHome() {
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [showOrderTest, setShowOrderTest] = useState(false);
   const [showActivateCode, setShowActivateCode] = useState(false);
+  const [showRequestSponsor, setShowRequestSponsor] = useState(false);
 
   const user = mockUser;
   const wallet = mockWallet;
@@ -53,6 +59,7 @@ export default function PatientHome() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Button variant="ghost" size="icon" data-testid="button-back" asChild>
                 <a href="/">
                   <ArrowLeft className="h-5 w-5" />
@@ -101,7 +108,7 @@ export default function PatientHome() {
               <CardTitle>Quick Actions</CardTitle>
               <CardDescription>Get started with sexual health testing</CardDescription>
             </CardHeader>
-            <CardContent className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <CardContent className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <Button
                 variant="outline"
                 className="h-auto py-6 flex-col gap-2"
@@ -122,6 +129,15 @@ export default function PatientHome() {
               </Button>
               <Button
                 variant="outline"
+                className="h-auto py-6 px-2 flex-col gap-2 border-blue-300 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30"
+                onClick={() => setShowRequestSponsor(true)}
+                data-testid="button-request-sponsor"
+              >
+                <HandCoins className="h-6 w-6 text-blue-600" />
+                <span className="text-sm whitespace-nowrap">Request Sponsor</span>
+              </Button>
+              <Button
+                variant="outline"
                 className="h-auto py-6 flex-col gap-2"
                 asChild
                 data-testid="button-find-center"
@@ -129,6 +145,17 @@ export default function PatientHome() {
                 <a href="/centers?from=patient">
                   <MapPin className="h-6 w-6" />
                   <span className="text-sm">Find Center</span>
+                </a>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-auto py-6 flex-col gap-2"
+                asChild
+                data-testid="button-learn"
+              >
+                <a href="/learn">
+                  <BookOpen className="h-6 w-6" />
+                  <span className="text-sm">Learn</span>
                 </a>
               </Button>
               <Button
@@ -175,9 +202,11 @@ export default function PatientHome() {
                     <span>100% Privacy</span>
                   </div>
                 </div>
-                <Button variant="outline" className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900">
-                  <Crown className="h-4 w-4 mr-2" />
-                  Book Home Service
+                <Button variant="outline" className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900" asChild>
+                  <a href="/book-home-service">
+                    <Crown className="h-4 w-4 mr-2" />
+                    Book Home Service
+                  </a>
                 </Button>
               </div>
             </div>
@@ -279,6 +308,7 @@ export default function PatientHome() {
       <FundWalletDialog open={showFundWallet} onOpenChange={setShowFundWallet} />
       <OrderTestDialog open={showOrderTest} onOpenChange={setShowOrderTest} />
       <ActivateCodeDialog open={showActivateCode} onOpenChange={setShowActivateCode} />
+      <RequestSponsorDialog open={showRequestSponsor} onOpenChange={setShowRequestSponsor} />
     </div>
   );
 }

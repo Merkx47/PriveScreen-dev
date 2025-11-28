@@ -5,7 +5,23 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, MapPin, Gift, User, Calendar, Shield } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
+import {
+  CheckCircle2,
+  MapPin,
+  Gift,
+  User,
+  Calendar,
+  Shield,
+  Heart,
+  AlertTriangle,
+  Phone,
+  ExternalLink,
+  XCircle,
+  HelpCircle,
+  BookOpen
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { mockCodeValidation } from "@/lib/mock-data";
 
@@ -14,11 +30,43 @@ interface ActivateCodeDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+type Step = "enter" | "preview" | "consent" | "safety" | "activated" | "declined";
+
+// Safety resources - discreet and helpful
+const safetyResources = [
+  {
+    name: "WARIF (Women at Risk International Foundation)",
+    phone: "0800 0000 321",
+    description: "24/7 confidential support for gender-based violence",
+  },
+  {
+    name: "Mirabel Centre",
+    phone: "+234 1 461 9747",
+    description: "Free medical, counseling, and legal support",
+  },
+  {
+    name: "NAPTIP Helpline",
+    phone: "0800 0000 123",
+    description: "National Agency for trafficking and exploitation",
+  },
+];
+
+// ID types accepted
+const acceptedIdTypes = [
+  { value: "nin", label: "National Identification Number (NIN)" },
+  { value: "bvn", label: "Bank Verification Number (BVN)" },
+  { value: "passport", label: "International Passport" },
+  { value: "drivers_license", label: "Driver's License" },
+  { value: "voters_card", label: "Voter's Card" },
+  { value: "residence_permit", label: "Residence Permit (for visitors)" },
+];
+
 export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogProps) {
   const { toast } = useToast();
   const [code, setCode] = useState("");
-  const [step, setStep] = useState<"enter" | "preview" | "activated">("enter");
+  const [step, setStep] = useState<Step>("enter");
   const [isValidating, setIsValidating] = useState(false);
+  const [declineReason, setDeclineReason] = useState<string | null>(null);
 
   // Simulated validated code data
   const validatedCode = step !== "enter" ? mockCodeValidation : null;
@@ -41,6 +89,20 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
     }, 1000);
   };
 
+  const handleProceedToConsent = () => {
+    setStep("consent");
+  };
+
+  const handleConsentYes = () => {
+    // User confirms voluntary participation
+    handleActivate();
+  };
+
+  const handleConsentUnsure = () => {
+    // Show safety resources without alerting sponsor
+    setStep("safety");
+  };
+
   const handleActivate = () => {
     setIsValidating(true);
     // Simulate activation
@@ -54,9 +116,20 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
     }, 1000);
   };
 
+  const handleDecline = (reason: string) => {
+    setDeclineReason(reason);
+    setStep("declined");
+    // In real app: notify sponsor of decline (without revealing reason if safety-related)
+    toast({
+      title: "Code Declined",
+      description: "The sponsor has been notified. You can request a refund if applicable.",
+    });
+  };
+
   const handleClose = () => {
     setCode("");
     setStep("enter");
+    setDeclineReason(null);
     onOpenChange(false);
   };
 
@@ -65,19 +138,30 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
     window.location.href = "/centers";
   };
 
+  const handleLearnAboutSTIs = () => {
+    handleClose();
+    window.location.href = "/learn";
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {step === "enter" && "Activate Assessment Code"}
             {step === "preview" && "Code Details"}
+            {step === "consent" && "Before You Continue"}
+            {step === "safety" && "Your Safety Matters"}
             {step === "activated" && "Code Activated!"}
+            {step === "declined" && "Code Declined"}
           </DialogTitle>
           <DialogDescription>
             {step === "enter" && "Enter the code you received from your sponsor"}
             {step === "preview" && "Review your test details before activating"}
+            {step === "consent" && "We want to ensure you're comfortable"}
+            {step === "safety" && "Confidential resources for you"}
             {step === "activated" && "You're ready to take your test"}
+            {step === "declined" && "The sponsor has been notified"}
           </DialogDescription>
         </DialogHeader>
 
@@ -110,6 +194,16 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                 activating it will allow you to take a sexual health test at no cost to you.
               </p>
             </div>
+
+            {/* Learn More Link */}
+            <Button
+              variant="ghost"
+              className="w-full text-sm text-muted-foreground"
+              onClick={handleLearnAboutSTIs}
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              Not sure what STI testing involves? Learn more
+            </Button>
 
             <Button
               onClick={handleValidate}
@@ -186,18 +280,157 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                 Back
               </Button>
               <Button
-                onClick={handleActivate}
+                onClick={handleProceedToConsent}
                 className="flex-1"
-                disabled={isValidating}
-                data-testid="button-activate-code"
+                data-testid="button-continue-consent"
               >
-                {isValidating ? "Activating..." : "Activate Code"}
+                Continue
               </Button>
             </div>
+
+            <Separator />
+
+            {/* Decline option */}
+            <Button
+              variant="ghost"
+              className="w-full text-muted-foreground"
+              onClick={() => handleDecline("user_choice")}
+            >
+              <XCircle className="h-4 w-4 mr-2" />
+              I don't want to take this test
+            </Button>
           </div>
         )}
 
-        {/* Step 3: Activated Success */}
+        {/* Step 3: Consent Check */}
+        {step === "consent" && (
+          <div className="space-y-4">
+            <div className="text-center py-4">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                <Heart className="h-8 w-8 text-primary" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Your Choice Matters</h3>
+              <p className="text-sm text-muted-foreground">
+                Taking an STI test should always be your personal decision.
+              </p>
+            </div>
+
+            <Card className="p-4 bg-muted/50">
+              <p className="text-sm font-medium mb-3">Are you taking this test voluntarily?</p>
+              <div className="space-y-2">
+                <Button
+                  onClick={handleConsentYes}
+                  className="w-full justify-start"
+                  variant="outline"
+                  disabled={isValidating}
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-3 text-green-600" />
+                  Yes, this is my choice
+                </Button>
+                <Button
+                  onClick={handleConsentUnsure}
+                  className="w-full justify-start"
+                  variant="outline"
+                >
+                  <HelpCircle className="h-4 w-4 mr-3 text-amber-600" />
+                  I'm not sure / I'd like more information
+                </Button>
+              </div>
+            </Card>
+
+            <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+              <Shield className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                <strong>No pressure, no judgment.</strong> Your response here is completely private
+                and will NOT be shared with your sponsor.
+              </AlertDescription>
+            </Alert>
+
+            <Button variant="ghost" onClick={() => setStep("preview")} className="w-full">
+              ← Back to code details
+            </Button>
+          </div>
+        )}
+
+        {/* Step 4: Safety Resources (if user clicks "not sure") */}
+        {step === "safety" && (
+          <div className="space-y-4">
+            <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+              <Heart className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 dark:text-amber-200">
+                We understand. Here are some confidential resources if you need support.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Confidential Support Lines (Nigeria)</p>
+              {safetyResources.map((resource, idx) => (
+                <Card key={idx} className="p-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-sm">{resource.name}</p>
+                      <p className="text-xs text-muted-foreground">{resource.description}</p>
+                    </div>
+                    <a
+                      href={`tel:${resource.phone.replace(/\s/g, '')}`}
+                      className="flex items-center gap-1 text-sm text-primary hover:underline"
+                    >
+                      <Phone className="h-3 w-3" />
+                      {resource.phone}
+                    </a>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-3">
+              <p className="text-sm font-medium">Understanding Your Rights</p>
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p>• You have the right to decide when and if you take a health test</p>
+                <p>• No one should pressure, threaten, or force you into testing</p>
+                <p>• Testing should be for your benefit, not to control you</p>
+                <p>• If you feel unsafe, please reach out to the resources above</p>
+              </div>
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">What would you like to do?</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={handleConsentYes}
+                  variant="outline"
+                  className="h-auto py-3"
+                  disabled={isValidating}
+                >
+                  <div className="text-center">
+                    <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-green-600" />
+                    <span className="text-xs">Proceed with test</span>
+                  </div>
+                </Button>
+                <Button
+                  onClick={() => handleDecline("needs_time")}
+                  variant="outline"
+                  className="h-auto py-3"
+                >
+                  <div className="text-center">
+                    <XCircle className="h-5 w-5 mx-auto mb-1 text-muted-foreground" />
+                    <span className="text-xs">Decline for now</span>
+                  </div>
+                </Button>
+              </div>
+            </div>
+
+            <Button variant="ghost" onClick={() => setStep("consent")} className="w-full">
+              ← Back
+            </Button>
+          </div>
+        )}
+
+        {/* Step 5: Activated Success */}
         {step === "activated" && (
           <div className="space-y-4 text-center">
             <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
@@ -220,9 +453,19 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-primary" />
-                  <span>Government-issued ID (BVN, NIN, or National ID)</span>
+                  <span>Valid ID (any of the following):</span>
                 </li>
               </ul>
+              <div className="ml-6 mt-2 flex flex-wrap gap-1">
+                {acceptedIdTypes.slice(0, 4).map((id) => (
+                  <Badge key={id.value} variant="outline" className="text-xs">
+                    {id.label.split(' ')[0]}
+                  </Badge>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 ml-6">
+                International visitors: Passport or Residence Permit accepted
+              </p>
             </Card>
 
             <div className="flex gap-2">
@@ -234,6 +477,54 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                 Find Center
               </Button>
             </div>
+          </div>
+        )}
+
+        {/* Step 6: Declined */}
+        {step === "declined" && (
+          <div className="space-y-4 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto">
+              <XCircle className="h-8 w-8 text-muted-foreground" />
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold mb-1">Code Declined</h3>
+              <p className="text-sm text-muted-foreground">
+                We've notified the sponsor that you've declined this test.
+                They may be eligible for a refund.
+              </p>
+            </div>
+
+            <Card className="p-4 bg-muted/50 text-left">
+              <p className="text-sm text-muted-foreground">
+                <strong>Remember:</strong> Your health decisions are yours to make.
+                If you ever want to get tested on your own terms, you can:
+              </p>
+              <ul className="text-sm text-muted-foreground mt-2 space-y-1">
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  Order a test through your own wallet
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                  Visit a center directly for anonymous testing
+                </li>
+              </ul>
+            </Card>
+
+            {/* Learn about STIs */}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={handleLearnAboutSTIs}
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              Learn About STI Testing
+            </Button>
+
+            <Button onClick={handleClose} className="w-full">
+              Close
+            </Button>
           </div>
         )}
       </DialogContent>

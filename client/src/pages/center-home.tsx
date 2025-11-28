@@ -1,19 +1,62 @@
+import * as React from "react";
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, CheckCircle2, Upload, ArrowLeft, Settings } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Search,
+  CheckCircle2,
+  Upload,
+  ArrowLeft,
+  Settings,
+  Wallet,
+  TrendingUp,
+  Home,
+  Award,
+  ArrowDownToLine,
+  Clock,
+  FileText
+} from "lucide-react";
 import { ValidateCodeDialog } from "@/components/validate-code-dialog";
 import { CenterPricingDialog } from "@/components/center-pricing-dialog";
+import { WithdrawDialog } from "@/components/withdraw-dialog";
 import { PriveScreenLogo } from "@/components/logo";
-import { mockCenterTests } from "@/lib/mock-data";
+import { ThemeToggle } from "@/components/theme-toggle";
+import {
+  mockCenterTests,
+  mockCenterWallet,
+  mockCenterRevenue,
+  mockCenterWithdrawals,
+  type CenterRevenueItem
+} from "@/lib/mock-data";
 
 export default function CenterHome() {
   const [codeInput, setCodeInput] = useState("");
   const [showValidate, setShowValidate] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
+  const [showWithdraw, setShowWithdraw] = useState(false);
   const recentTests = mockCenterTests;
+  const wallet = mockCenterWallet;
+  const revenue = mockCenterRevenue;
+  const withdrawals = mockCenterWithdrawals;
+
+  // Calculate revenue stats
+  const testRevenue = revenue.filter(r => r.type === 'test').reduce((sum, r) => sum + parseFloat(r.amount), 0);
+  const homeServiceRevenue = revenue.filter(r => r.type === 'home_service').reduce((sum, r) => sum + parseFloat(r.amount), 0);
+  const referralRevenue = revenue.filter(r => r.type === 'prime_referral').reduce((sum, r) => sum + parseFloat(r.amount), 0);
+
+  const getRevenueBadge = (type: CenterRevenueItem['type']) => {
+    switch (type) {
+      case 'test':
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"><FileText className="h-3 w-3 mr-1" />Test</Badge>;
+      case 'home_service':
+        return <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"><Home className="h-3 w-3 mr-1" />Home</Badge>;
+      case 'prime_referral':
+        return <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"><Award className="h-3 w-3 mr-1" />Referral</Badge>;
+    }
+  };
 
   const handleValidate = () => {
     if (!codeInput) return;
@@ -34,6 +77,7 @@ export default function CenterHome() {
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="default" className="px-3 py-1" data-testid="badge-verified">Verified</Badge>
+              <ThemeToggle />
               <Button variant="ghost" size="icon" data-testid="button-back" asChild>
                 <a href="/">
                   <ArrowLeft className="h-5 w-5" />
@@ -47,9 +91,69 @@ export default function CenterHome() {
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-8">
           <h2 className="text-3xl font-semibold mb-2">Diagnostic Center Portal</h2>
-          <p className="text-muted-foreground">Validate assessment codes and upload test results</p>
+          <p className="text-muted-foreground">Validate assessment codes, upload results, and manage earnings</p>
         </div>
 
+        {/* Wallet & Stats Row */}
+        <div className="grid md:grid-cols-5 gap-4 mb-8">
+          <Card className="md:col-span-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Available Balance
+                </CardTitle>
+                <Badge variant="outline" className="text-xs">NGN</Badge>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold mb-4">
+                ₦{parseFloat(wallet.balance).toLocaleString()}
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => setShowWithdraw(true)} className="flex-1">
+                  <ArrowDownToLine className="h-4 w-4 mr-2" />
+                  Withdraw
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                Total Earnings: ₦{parseFloat(wallet.totalEarnings).toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Test Revenue</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">₦{testRevenue.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground mt-1">From walk-in tests</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Home Service</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-600">₦{homeServiceRevenue.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground mt-1">Home collection fees</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Referrals</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">₦{referralRevenue.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground mt-1">Prime referral bonus</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
         <div className="grid md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader>
@@ -131,48 +235,149 @@ export default function CenterHome() {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Tests Processed</CardTitle>
-            <CardDescription>
-              Tests conducted at your facility in the last 30 days
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentTests.map((test) => (
-                <div
-                  key={test.id}
-                  className="p-4 border rounded-lg"
-                  data-testid={`card-test-${test.id}`}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <CheckCircle2 className="h-5 w-5 text-primary" />
-                        <h3 className="font-semibold" data-testid={`text-test-code-${test.id}`}>Code: {test.code}</h3>
+        {/* Tabs for Revenue & Tests */}
+        <Tabs defaultValue="revenue" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="revenue">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Revenue History
+            </TabsTrigger>
+            <TabsTrigger value="tests">
+              <CheckCircle2 className="h-4 w-4 mr-2" />
+              Recent Tests
+            </TabsTrigger>
+            <TabsTrigger value="withdrawals">
+              <ArrowDownToLine className="h-4 w-4 mr-2" />
+              Withdrawals
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="revenue">
+            <Card>
+              <CardHeader>
+                <CardTitle>Revenue History</CardTitle>
+                <CardDescription>
+                  Your earnings from tests, home services, and referrals
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {revenue.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center p-4 border rounded-lg hover:bg-muted/50"
+                    >
+                      <div className="w-24 flex-shrink-0">
+                        {getRevenueBadge(item.type)}
                       </div>
-                      <p className="text-sm text-muted-foreground" data-testid={`text-patient-${test.id}`}>
-                        Patient verified as: {test.patientName}
-                      </p>
+                      <div className="flex-1 min-w-0 px-4">
+                        <p className="font-medium truncate">{item.description}</p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          Code: {item.patientCode}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-semibold text-green-600">+₦{parseFloat(item.amount).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{item.date.toLocaleDateString()}</p>
+                      </div>
                     </div>
-                    <Badge variant="default" data-testid={`badge-status-${test.id}`}>Completed</Badge>
-                  </div>
-                  <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-muted-foreground mb-1">Test Type</p>
-                      <p className="font-medium" data-testid={`text-type-${test.id}`}>{test.testType}</p>
-                    </div>
-                    <div>
-                      <p className="text-muted-foreground mb-1">Test Date</p>
-                      <p data-testid={`text-date-${test.id}`}>{test.testedAt.toLocaleDateString()}</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="tests">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Tests Processed</CardTitle>
+                <CardDescription>
+                  Tests conducted at your facility in the last 30 days
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {recentTests.map((test) => (
+                    <div
+                      key={test.id}
+                      className="p-4 border rounded-lg"
+                      data-testid={`card-test-${test.id}`}
+                    >
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CheckCircle2 className="h-5 w-5 text-primary" />
+                            <h3 className="font-semibold" data-testid={`text-test-code-${test.id}`}>Code: {test.code}</h3>
+                          </div>
+                          <p className="text-sm text-muted-foreground" data-testid={`text-patient-${test.id}`}>
+                            Patient verified as: {test.patientName}
+                          </p>
+                        </div>
+                        <Badge variant="default" data-testid={`badge-status-${test.id}`}>Completed</Badge>
+                      </div>
+                      <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-muted-foreground mb-1">Test Type</p>
+                          <p className="font-medium" data-testid={`text-type-${test.id}`}>{test.testType}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted-foreground mb-1">Test Date</p>
+                          <p data-testid={`text-date-${test.id}`}>{test.testedAt.toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="withdrawals">
+            <Card>
+              <CardHeader>
+                <CardTitle>Withdrawal History</CardTitle>
+                <CardDescription>
+                  Your past withdrawal requests and their status
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {withdrawals.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <ArrowDownToLine className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No withdrawals yet</p>
+                    <p className="text-sm">Your withdrawal history will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {withdrawals.map((withdrawal) => (
+                      <div
+                        key={withdrawal.id}
+                        className="flex items-center p-4 border rounded-lg"
+                      >
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium">₦{parseFloat(withdrawal.amount).toLocaleString()}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {withdrawal.bankName} - ****{withdrawal.accountNumber.slice(-4)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <Badge variant={withdrawal.status === 'completed' ? 'default' : withdrawal.status === 'processing' ? 'secondary' : 'outline'}>
+                            {withdrawal.status === 'completed' && <CheckCircle2 className="h-3 w-3 mr-1" />}
+                            {withdrawal.status === 'processing' && <Clock className="h-3 w-3 mr-1" />}
+                            {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {withdrawal.processedAt ? withdrawal.processedAt.toLocaleDateString() : withdrawal.createdAt.toLocaleDateString()}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
 
       <ValidateCodeDialog
@@ -184,6 +389,13 @@ export default function CenterHome() {
       <CenterPricingDialog
         open={showPricing}
         onOpenChange={setShowPricing}
+      />
+
+      <WithdrawDialog
+        open={showWithdraw}
+        onOpenChange={setShowWithdraw}
+        availableBalance={wallet.balance}
+        accountType="center"
       />
     </div>
   );

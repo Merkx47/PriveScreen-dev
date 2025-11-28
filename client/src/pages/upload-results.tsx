@@ -5,39 +5,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  Upload,
-  FileText,
   CheckCircle2,
-  Plus,
-  Trash2,
   AlertCircle,
   ArrowLeft,
   ArrowRight,
-  Loader2
+  Loader2,
+  Shield,
+  Plus,
+  Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PriveScreenLogo } from "@/components/logo";
-import { mockCodeValidation, mockTestStandards } from "@/lib/mock-data";
+import { mockCodeValidation } from "@/lib/mock-data";
 
-interface TestParameter {
+interface TestEntry {
   id: string;
-  parameter: string;
-  value: string;
+  testName: string;
+  yourValue: string;
   referenceRange: string;
-  status: "normal" | "abnormal" | "critical";
+  result: string;
 }
 
 export default function UploadResults() {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [step, setStep] = useState<"code" | "upload" | "confirm">("code");
+  const [step, setStep] = useState<"code" | "results" | "confirm">("code");
   const [assessmentCode, setAssessmentCode] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [codeValid, setCodeValid] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [testParameters, setTestParameters] = useState<TestParameter[]>([]);
+  const [tests, setTests] = useState<TestEntry[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Get test type from validated code
@@ -52,110 +50,45 @@ export default function UploadResults() {
       // For demo, accept any 12-char code
       if (assessmentCode.length === 12) {
         setCodeValid(true);
-        // Initialize test parameters based on test standard
-        if (mockCodeValidation.testsIncluded) {
-          const initialParams = mockCodeValidation.testsIncluded.map((test, idx) => ({
-            id: `param-${idx}`,
-            parameter: test,
-            value: "",
-            referenceRange: getDefaultReference(test),
-            status: "normal" as const,
-          }));
-          setTestParameters(initialParams);
-        }
-        setStep("upload");
+        // Initialize with one empty test entry
+        setTests([createEmptyTest()]);
+        setStep("results");
       }
       setIsValidating(false);
     }, 1000);
   };
 
-  const getDefaultReference = (testName: string): string => {
-    const references: Record<string, string> = {
-      "HIV 1&2": "Non-Reactive",
-      "Hepatitis B": "Negative",
-      "Hepatitis C": "Negative",
-      "Syphilis": "Non-Reactive",
-      "Gonorrhea": "Not Detected",
-      "Chlamydia": "Not Detected",
-      "HIV 1&2 Antibody": "Non-Reactive",
-      "Hepatitis B Surface Antigen": "Negative",
-      "Hepatitis C Antibody": "Negative",
-      "Gonorrhea PCR": "Not Detected",
-      "Chlamydia PCR": "Not Detected",
-      "Syphilis VDRL": "Non-Reactive",
-    };
-    return references[testName] || "Normal";
+  const createEmptyTest = (): TestEntry => ({
+    id: `test-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+    testName: "",
+    yourValue: "",
+    referenceRange: "",
+    result: "",
+  });
+
+  const addTest = () => {
+    setTests([...tests, createEmptyTest()]);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
-      if (!allowedTypes.includes(file.type)) {
-        toast({
-          title: "Invalid file type",
-          description: "Please upload a PDF or image file (JPG, PNG)",
-          variant: "destructive",
-        });
-        return;
-      }
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast({
-          title: "File too large",
-          description: "Maximum file size is 10MB",
-          variant: "destructive",
-        });
-        return;
-      }
-      setSelectedFile(file);
+  const removeTest = (id: string) => {
+    if (tests.length > 1) {
+      setTests(tests.filter(t => t.id !== id));
     }
   };
 
-  const updateParameter = (id: string, field: keyof TestParameter, value: string) => {
-    setTestParameters(params =>
-      params.map(p => {
-        if (p.id === id) {
-          const updated = { ...p, [field]: value };
-          // Auto-determine status based on value vs reference
-          if (field === "value") {
-            const isNormal = value.toLowerCase() === p.referenceRange.toLowerCase() ||
-              value.toLowerCase().includes("non-reactive") ||
-              value.toLowerCase().includes("negative") ||
-              value.toLowerCase().includes("not detected") ||
-              value.toLowerCase().includes("normal");
-            updated.status = isNormal ? "normal" : "abnormal";
-          }
-          return updated;
-        }
-        return p;
-      })
-    );
-  };
-
-  const addParameter = () => {
-    const newId = `param-${Date.now()}`;
-    setTestParameters([...testParameters, {
-      id: newId,
-      parameter: "",
-      value: "",
-      referenceRange: "",
-      status: "normal",
-    }]);
-  };
-
-  const removeParameter = (id: string) => {
-    setTestParameters(params => params.filter(p => p.id !== id));
+  const updateTest = (id: string, field: keyof TestEntry, value: string) => {
+    setTests(tests.map(t =>
+      t.id === id ? { ...t, [field]: value } : t
+    ));
   };
 
   const handleSubmit = () => {
     // Validate all fields are filled
-    const incompleteParams = testParameters.filter(p => !p.parameter || !p.value);
-    if (incompleteParams.length > 0) {
+    const incompleteTests = tests.filter(t => !t.testName || !t.yourValue || !t.referenceRange || !t.result);
+    if (incompleteTests.length > 0) {
       toast({
         title: "Incomplete data",
-        description: "Please fill in all test parameters and values",
+        description: "Please fill in all fields for each test",
         variant: "destructive",
       });
       return;
@@ -165,7 +98,7 @@ export default function UploadResults() {
     // Simulate API call
     setTimeout(() => {
       toast({
-        title: "Results uploaded successfully",
+        title: "Results submitted successfully",
         description: `Test results for code ${assessmentCode} have been submitted`,
       });
       setIsSubmitting(false);
@@ -177,8 +110,7 @@ export default function UploadResults() {
     setStep("code");
     setAssessmentCode("");
     setCodeValid(false);
-    setSelectedFile(null);
-    setTestParameters([]);
+    setTests([]);
   };
 
   return (
@@ -195,12 +127,12 @@ export default function UploadResults() {
               </Button>
               <PriveScreenLogo size={32} />
               <div>
-                <h1 className="text-xl font-bold">Upload Test Results</h1>
+                <h1 className="text-xl font-bold">Enter Test Results</h1>
                 <p className="text-sm text-muted-foreground">Diagnostic Center Portal</p>
               </div>
             </div>
             <Badge variant="outline" className="text-sm">
-              {step === "code" ? "Step 1 of 3" : step === "upload" ? "Step 2 of 3" : "Step 3 of 3"}
+              {step === "code" ? "Step 1 of 3" : step === "results" ? "Step 2 of 3" : "Step 3 of 3"}
             </Badge>
           </div>
         </div>
@@ -213,20 +145,20 @@ export default function UploadResults() {
             <div className={`flex items-center gap-2 ${step === "code" ? "text-primary" : "text-muted-foreground"}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium border-2 ${
                 step === "code" ? "bg-primary text-primary-foreground border-primary" :
-                (step === "upload" || step === "confirm") ? "bg-primary/20 text-primary border-primary" : "bg-muted border-muted"
+                (step === "results" || step === "confirm") ? "bg-primary/20 text-primary border-primary" : "bg-muted border-muted"
               }`}>
-                {(step === "upload" || step === "confirm") ? <CheckCircle2 className="h-5 w-5" /> : "1"}
+                {(step === "results" || step === "confirm") ? <CheckCircle2 className="h-5 w-5" /> : "1"}
               </div>
               <span className="font-medium hidden sm:inline">Validate Code</span>
             </div>
             <div className="flex-1 h-1 bg-border rounded">
               <div className={`h-full rounded transition-all duration-300 ${
-                step === "upload" || step === "confirm" ? "bg-primary w-full" : "bg-transparent w-0"
+                step === "results" || step === "confirm" ? "bg-primary w-full" : "bg-transparent w-0"
               }`} />
             </div>
-            <div className={`flex items-center gap-2 ${step === "upload" ? "text-primary" : "text-muted-foreground"}`}>
+            <div className={`flex items-center gap-2 ${step === "results" ? "text-primary" : "text-muted-foreground"}`}>
               <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium border-2 ${
-                step === "upload" ? "bg-primary text-primary-foreground border-primary" :
+                step === "results" ? "bg-primary text-primary-foreground border-primary" :
                 step === "confirm" ? "bg-primary/20 text-primary border-primary" : "bg-muted border-muted"
               }`}>
                 {step === "confirm" ? <CheckCircle2 className="h-5 w-5" /> : "2"}
@@ -258,7 +190,7 @@ export default function UploadResults() {
             <CardHeader className="text-center">
               <CardTitle className="text-2xl">Enter Assessment Code</CardTitle>
               <CardDescription>
-                Enter the patient's assessment code to begin uploading results
+                Enter the patient's assessment code to begin entering results
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -308,8 +240,8 @@ export default function UploadResults() {
           </Card>
         )}
 
-        {/* Step 2: Upload Results */}
-        {step === "upload" && validatedData && (
+        {/* Step 2: Enter Results */}
+        {step === "results" && validatedData && (
           <div className="space-y-6">
             {/* Validated Code Info */}
             <Card className="bg-primary/5 border-primary/20">
@@ -335,126 +267,80 @@ export default function UploadResults() {
               </CardContent>
             </Card>
 
-            {/* File Upload */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Supporting Document</CardTitle>
-                <CardDescription>Upload the lab report or supporting document (optional but recommended)</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                  {selectedFile ? (
-                    <div className="flex items-center justify-center gap-4">
-                      <FileText className="h-12 w-12 text-primary" />
-                      <div className="text-left">
-                        <p className="font-medium text-lg">{selectedFile.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedFile(null)}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Remove
-                      </Button>
-                    </div>
-                  ) : (
-                    <label className="cursor-pointer block">
-                      <Upload className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="font-medium text-lg mb-1">Click to upload or drag and drop</p>
-                      <p className="text-sm text-muted-foreground">PDF, JPG, PNG (max 10MB)</p>
-                      <input
-                        type="file"
-                        className="hidden"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        onChange={handleFileChange}
-                        data-testid="input-file-upload"
-                      />
-                    </label>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Privacy Notice */}
+            <Alert className="border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30">
+              <Shield className="h-4 w-4 text-green-600" />
+              <AlertDescription className="text-green-800 dark:text-green-200">
+                <strong>Privacy First:</strong> Enter only test results below. Do NOT include patient names or identifying information.
+                Results are linked anonymously via the assessment code only.
+              </AlertDescription>
+            </Alert>
 
-            {/* Test Parameters */}
+            {/* Test Entries */}
             <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Test Results</CardTitle>
-                    <CardDescription>Enter the results for each test parameter</CardDescription>
-                  </div>
-                  <Button variant="outline" onClick={addParameter}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Parameter
-                  </Button>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Test Results</CardTitle>
+                  <CardDescription>Enter the results for each test performed</CardDescription>
                 </div>
+                <Button onClick={addTest} variant="outline" size="sm">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Test
+                </Button>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {testParameters.map((param, index) => (
-                    <Card key={param.id} className="p-4 bg-muted/30">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Parameter {index + 1}</span>
-                          {testParameters.length > 1 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeParameter(param.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
-                        </div>
-                        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {tests.map((test, index) => (
+                    <Card key={test.id} className="p-4 bg-muted/30">
+                      <div className="flex items-start gap-4">
+                        <div className="flex-1 grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
                           <div className="space-y-2">
                             <Label className="text-sm">Test Name</Label>
                             <Input
-                              placeholder="e.g., HIV 1&2"
-                              value={param.parameter}
-                              onChange={(e) => updateParameter(param.id, "parameter", e.target.value)}
-                              data-testid={`input-param-name-${index}`}
+                              placeholder="e.g., HIV 1/2"
+                              value={test.testName}
+                              onChange={(e) => updateTest(test.id, "testName", e.target.value)}
+                              data-testid={`input-test-name-${index}`}
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-sm">Result Value</Label>
+                            <Label className="text-sm">Your Value</Label>
                             <Input
-                              placeholder="e.g., Non-Reactive"
-                              value={param.value}
-                              onChange={(e) => updateParameter(param.id, "value", e.target.value)}
-                              data-testid={`input-param-value-${index}`}
+                              placeholder="e.g., Negative"
+                              value={test.yourValue}
+                              onChange={(e) => updateTest(test.id, "yourValue", e.target.value)}
+                              data-testid={`input-your-value-${index}`}
                             />
                           </div>
                           <div className="space-y-2">
                             <Label className="text-sm">Reference Range</Label>
                             <Input
-                              placeholder="e.g., Non-Reactive"
-                              value={param.referenceRange}
-                              onChange={(e) => updateParameter(param.id, "referenceRange", e.target.value)}
-                              data-testid={`input-param-reference-${index}`}
+                              placeholder="e.g., Negative"
+                              value={test.referenceRange}
+                              onChange={(e) => updateTest(test.id, "referenceRange", e.target.value)}
+                              data-testid={`input-reference-range-${index}`}
                             />
                           </div>
                           <div className="space-y-2">
-                            <Label className="text-sm">Status</Label>
-                            <Select
-                              value={param.status}
-                              onValueChange={(value) => updateParameter(param.id, "status", value)}
-                            >
-                              <SelectTrigger data-testid={`select-param-status-${index}`}>
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="normal">Normal</SelectItem>
-                                <SelectItem value="abnormal">Abnormal</SelectItem>
-                                <SelectItem value="critical">Critical</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <Label className="text-sm">Result</Label>
+                            <Input
+                              placeholder="e.g., Normal"
+                              value={test.result}
+                              onChange={(e) => updateTest(test.id, "result", e.target.value)}
+                              data-testid={`input-result-${index}`}
+                            />
                           </div>
                         </div>
+                        {tests.length > 1 && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive mt-6"
+                            onClick={() => removeTest(test.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </Card>
                   ))}
@@ -486,7 +372,7 @@ export default function UploadResults() {
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Summary */}
-                <div className="grid sm:grid-cols-3 gap-4 p-4 bg-muted/50 rounded-lg">
+                <div className="grid sm:grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Assessment Code</p>
                     <p className="font-mono font-bold text-lg">{assessmentCode}</p>
@@ -495,39 +381,28 @@ export default function UploadResults() {
                     <p className="text-sm text-muted-foreground mb-1">Test Type</p>
                     <p className="font-medium">{validatedData.testType}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">Document</p>
-                    <p className="font-medium">{selectedFile ? selectedFile.name : "None attached"}</p>
-                  </div>
                 </div>
 
                 {/* Results Table */}
                 <div>
                   <h4 className="font-semibold mb-3">Test Results Summary</h4>
-                  <div className="border rounded-lg overflow-hidden">
+                  <div className="border rounded-lg overflow-hidden overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-muted">
                         <tr>
-                          <th className="px-4 py-3 text-left font-medium">Parameter</th>
+                          <th className="px-4 py-3 text-left font-medium">Test Name</th>
+                          <th className="px-4 py-3 text-left font-medium">Your Value</th>
+                          <th className="px-4 py-3 text-left font-medium">Reference Range</th>
                           <th className="px-4 py-3 text-left font-medium">Result</th>
-                          <th className="px-4 py-3 text-left font-medium">Reference</th>
-                          <th className="px-4 py-3 text-left font-medium">Status</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {testParameters.map((param, idx) => (
-                          <tr key={param.id} className={idx % 2 === 0 ? "" : "bg-muted/30"}>
-                            <td className="px-4 py-3">{param.parameter}</td>
-                            <td className="px-4 py-3 font-medium">{param.value}</td>
-                            <td className="px-4 py-3 text-muted-foreground">{param.referenceRange}</td>
-                            <td className="px-4 py-3">
-                              <Badge
-                                variant={param.status === "normal" ? "default" : "destructive"}
-                              >
-                                {param.status === "normal" ? "Normal" :
-                                 param.status === "abnormal" ? "Abnormal" : "Critical"}
-                              </Badge>
-                            </td>
+                        {tests.map((test, idx) => (
+                          <tr key={test.id} className={idx % 2 === 0 ? "" : "bg-muted/30"}>
+                            <td className="px-4 py-3">{test.testName}</td>
+                            <td className="px-4 py-3 font-medium">{test.yourValue}</td>
+                            <td className="px-4 py-3 text-muted-foreground">{test.referenceRange}</td>
+                            <td className="px-4 py-3 font-medium">{test.result}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -554,7 +429,7 @@ export default function UploadResults() {
 
             {/* Navigation */}
             <div className="flex gap-4 justify-between">
-              <Button variant="outline" onClick={() => setStep("upload")} className="h-12 px-8">
+              <Button variant="outline" onClick={() => setStep("results")} className="h-12 px-8">
                 <ArrowLeft className="h-5 w-5 mr-2" />
                 Back to Edit
               </Button>

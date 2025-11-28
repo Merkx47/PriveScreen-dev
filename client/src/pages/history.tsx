@@ -2,17 +2,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, CheckCircle2, Clock, XCircle } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Clock, XCircle, Home, MapPin, Calendar, Crown, Building2 } from "lucide-react";
 import { AssessmentCodeCard } from "@/components/assessment-code-card";
 import { PriveScreenLogo } from "@/components/logo";
 import { TestResultCard } from "@/components/test-result-card";
-import { mockAssessmentCodes, mockTestResults, mockTransactions } from "@/lib/mock-data";
+import { mockAssessmentCodes, mockTestResults, mockTransactions, mockHomeServiceBookings, mockDiagnosticCenters, mockTestStandards } from "@/lib/mock-data";
 import { format } from "date-fns";
 
 export default function History() {
   const codes = mockAssessmentCodes;
   const results = mockTestResults;
   const transactions = mockTransactions;
+  const bookings = mockHomeServiceBookings;
+
+  const getBookingCenter = (centerId: string) => mockDiagnosticCenters.find(c => c.id === centerId);
+  const getBookingTest = (testId: string) => mockTestStandards.find(t => t.id === testId);
+
+  const getBookingStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'in_progress': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -37,21 +51,27 @@ export default function History() {
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
         <Tabs defaultValue="results" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="results" data-testid="tab-results">
-              Test Results
+              Results
               {results.length > 0 && (
                 <Badge variant="secondary" className="ml-2">{results.length}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="bookings" data-testid="tab-bookings">
+              Bookings
+              {bookings.length > 0 && (
+                <Badge variant="secondary" className="ml-2">{bookings.length}</Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="codes" data-testid="tab-codes">
-              Assessment Codes
+              Codes
               {codes.length > 0 && (
                 <Badge variant="secondary" className="ml-2">{codes.length}</Badge>
               )}
             </TabsTrigger>
             <TabsTrigger value="transactions" data-testid="tab-transactions">
-              Transactions
+              Wallet
               {transactions.length > 0 && (
                 <Badge variant="secondary" className="ml-2">{transactions.length}</Badge>
               )}
@@ -76,6 +96,102 @@ export default function History() {
                 {results.map((result) => (
                   <TestResultCard key={result.id} result={result} />
                 ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="bookings" className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold flex items-center gap-2">
+                <Crown className="h-5 w-5 text-amber-500" />
+                Home Service Bookings
+              </h2>
+              <p className="text-sm text-muted-foreground">{bookings.length} total</p>
+            </div>
+            {bookings.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6 text-center text-muted-foreground">
+                  <Home className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                  <p>No home service bookings yet</p>
+                  <p className="text-sm">Book a home sample collection to get started</p>
+                  <Button className="mt-4" asChild>
+                    <a href="/book-home-service">
+                      <Home className="h-4 w-4 mr-2" />
+                      Book Home Service
+                    </a>
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {bookings.map((booking) => {
+                  const center = getBookingCenter(booking.centerId);
+                  const test = getBookingTest(booking.testStandardId);
+                  const isUpcoming = booking.scheduledDate > new Date();
+
+                  return (
+                    <Card key={booking.id} className={isUpcoming ? "border-amber-200 dark:border-amber-800" : ""} data-testid={`card-booking-${booking.id}`}>
+                      <CardContent className="pt-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-full bg-amber-100 dark:bg-amber-900">
+                              <Home className="h-4 w-4 text-amber-600" />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold">{test?.name || 'Test'}</h3>
+                              <p className="text-sm text-muted-foreground">Home Sample Collection</p>
+                            </div>
+                          </div>
+                          <Badge className={getBookingStatusColor(booking.status)}>
+                            {booking.status === 'in_progress' ? 'In Progress' : booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                          </Badge>
+                        </div>
+
+                        <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Calendar className="h-3.5 w-3.5" />
+                              <span>
+                                {format(booking.scheduledDate, 'EEEE, MMMM d, yyyy')} at {booking.scheduledTime}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                              <Building2 className="h-3.5 w-3.5" />
+                              <span>{center?.name || 'Center'}</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-start gap-2 text-muted-foreground">
+                              <MapPin className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                              <span>{booking.address}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t flex items-center justify-between">
+                          <div className="text-sm text-muted-foreground">
+                            Booked: {format(booking.createdAt, 'PP')}
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold">₦{parseFloat(booking.price).toLocaleString()}</span>
+                            {booking.status === 'completed' && booking.resultId && (
+                              <Button size="sm" variant="outline" asChild>
+                                <a href={`/results/${booking.resultId}`}>
+                                  View Results
+                                </a>
+                              </Button>
+                            )}
+                            {isUpcoming && booking.status === 'confirmed' && (
+                              <Button size="sm" variant="outline" className="text-red-600 hover:text-red-700">
+                                Cancel
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </TabsContent>

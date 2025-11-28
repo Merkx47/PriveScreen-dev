@@ -21,16 +21,28 @@ import {
   Clock,
   AlertCircle,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  DollarSign,
+  TestTube,
+  Home,
+  Car
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { mockTestStandards } from "@/lib/mock-data";
+import { Separator } from "@/components/ui/separator";
 
 interface CenterOnboardingDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type Step = "info" | "documents" | "compliance" | "review" | "submitted";
+type Step = "info" | "documents" | "pricing" | "compliance" | "review" | "submitted";
+
+interface TestPricing {
+  testStandardId: string;
+  price: string;
+  homeServicePrice: string;
+}
 
 interface CenterFormData {
   // Basic Info
@@ -43,11 +55,17 @@ interface CenterFormData {
   email: string;
   contactPerson: string;
   contactRole: string;
+  operatingHours: string;
 
   // Documents
   cacCertificate: File | null;
   medicalLicense: File | null;
   facilityPhotos: File[];
+
+  // Pricing
+  testPricing: TestPricing[];
+  offersHomeService: boolean;
+  homeServiceRadius: string; // in km
 
   // Compliance
   hasQualifiedStaff: boolean;
@@ -66,6 +84,15 @@ const nigerianStates = [
   "Rivers", "Sokoto", "Taraba", "Yobe", "Zamfara"
 ];
 
+// Initialize test pricing with default suggested prices
+const initializeTestPricing = (): TestPricing[] => {
+  return mockTestStandards.map(test => ({
+    testStandardId: test.id,
+    price: test.price, // Use standard price as default suggestion
+    homeServicePrice: String(Math.round(parseFloat(test.price) * 1.3)), // 30% markup for home service
+  }));
+};
+
 export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingDialogProps) {
   const { toast } = useToast();
   const [step, setStep] = useState<Step>("info");
@@ -81,9 +108,13 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
     email: "",
     contactPerson: "",
     contactRole: "",
+    operatingHours: "",
     cacCertificate: null,
     medicalLicense: null,
     facilityPhotos: [],
+    testPricing: initializeTestPricing(),
+    offersHomeService: false,
+    homeServiceRadius: "10",
     hasQualifiedStaff: false,
     hasPrivateTestingArea: false,
     canFollowStandards: false,
@@ -94,6 +125,24 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
 
   const updateField = <K extends keyof CenterFormData>(field: K, value: CenterFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const updateTestPrice = (testStandardId: string, price: string) => {
+    setFormData(prev => ({
+      ...prev,
+      testPricing: prev.testPricing.map(tp =>
+        tp.testStandardId === testStandardId ? { ...tp, price } : tp
+      ),
+    }));
+  };
+
+  const updateHomeServicePrice = (testStandardId: string, homeServicePrice: string) => {
+    setFormData(prev => ({
+      ...prev,
+      testPricing: prev.testPricing.map(tp =>
+        tp.testStandardId === testStandardId ? { ...tp, homeServicePrice } : tp
+      ),
+    }));
   };
 
   const handleFileUpload = (field: "cacCertificate" | "medicalLicense", file: File | null) => {
@@ -141,6 +190,21 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
         }
         return true;
 
+      case "pricing":
+        const invalidPrices = formData.testPricing.filter(tp => {
+          const price = parseFloat(tp.price);
+          return isNaN(price) || price <= 0;
+        });
+        if (invalidPrices.length > 0) {
+          toast({
+            title: "Invalid Pricing",
+            description: "Please enter valid prices for all tests",
+            variant: "destructive",
+          });
+          return false;
+        }
+        return true;
+
       case "compliance":
         if (!formData.hasQualifiedStaff || !formData.hasPrivateTestingArea ||
             !formData.canFollowStandards || !formData.hasWasteDisposal ||
@@ -162,7 +226,7 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
   const nextStep = () => {
     if (!validateStep(step)) return;
 
-    const steps: Step[] = ["info", "documents", "compliance", "review"];
+    const steps: Step[] = ["info", "documents", "pricing", "compliance", "review"];
     const currentIndex = steps.indexOf(step);
     if (currentIndex < steps.length - 1) {
       setStep(steps[currentIndex + 1]);
@@ -170,7 +234,7 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
   };
 
   const prevStep = () => {
-    const steps: Step[] = ["info", "documents", "compliance", "review"];
+    const steps: Step[] = ["info", "documents", "pricing", "compliance", "review"];
     const currentIndex = steps.indexOf(step);
     if (currentIndex > 0) {
       setStep(steps[currentIndex - 1]);
@@ -197,9 +261,13 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
       email: "",
       contactPerson: "",
       contactRole: "",
+      operatingHours: "",
       cacCertificate: null,
       medicalLicense: null,
       facilityPhotos: [],
+      testPricing: initializeTestPricing(),
+      offersHomeService: false,
+      homeServiceRadius: "10",
       hasQualifiedStaff: false,
       hasPrivateTestingArea: false,
       canFollowStandards: false,
@@ -211,9 +279,11 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
   };
 
   const getStepNumber = () => {
-    const steps: Step[] = ["info", "documents", "compliance", "review"];
+    const steps: Step[] = ["info", "documents", "pricing", "compliance", "review"];
     return steps.indexOf(step) + 1;
   };
+
+  const getTestById = (id: string) => mockTestStandards.find(t => t.id === id);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -224,10 +294,11 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
             {step === "submitted" ? "Application Submitted" : "Center Onboarding Application"}
           </DialogTitle>
           <DialogDescription>
-            {step === "info" && "Step 1 of 4: Basic center information"}
-            {step === "documents" && "Step 2 of 4: Upload required documents"}
-            {step === "compliance" && "Step 3 of 4: Compliance requirements"}
-            {step === "review" && "Step 4 of 4: Review and submit"}
+            {step === "info" && "Step 1 of 5: Basic center information"}
+            {step === "documents" && "Step 2 of 5: Upload required documents"}
+            {step === "pricing" && "Step 3 of 5: Set your test pricing"}
+            {step === "compliance" && "Step 4 of 5: Compliance requirements"}
+            {step === "review" && "Step 5 of 5: Review and submit"}
             {step === "submitted" && "Your application is being reviewed"}
           </DialogDescription>
         </DialogHeader>
@@ -235,7 +306,7 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
         {/* Progress Indicator */}
         {step !== "submitted" && (
           <div className="flex items-center gap-2 py-2">
-            {[1, 2, 3, 4].map((num) => (
+            {[1, 2, 3, 4, 5].map((num) => (
               <div key={num} className="flex items-center flex-1">
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
                   num <= getStepNumber()
@@ -244,7 +315,7 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
                 }`}>
                   {num < getStepNumber() ? <CheckCircle2 className="h-4 w-4" /> : num}
                 </div>
-                {num < 4 && (
+                {num < 5 && (
                   <div className={`flex-1 h-1 mx-2 ${
                     num < getStepNumber() ? "bg-primary" : "bg-muted"
                   }`} />
@@ -358,6 +429,17 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
                   value={formData.contactRole}
                   onChange={(e) => updateField("contactRole", e.target.value)}
                   data-testid="input-contact-role"
+                />
+              </div>
+
+              <div className="col-span-2 space-y-2">
+                <Label htmlFor="operatingHours">Operating Hours</Label>
+                <Input
+                  id="operatingHours"
+                  placeholder="e.g., Mon-Fri: 8AM-6PM, Sat: 9AM-2PM"
+                  value={formData.operatingHours}
+                  onChange={(e) => updateField("operatingHours", e.target.value)}
+                  data-testid="input-operating-hours"
                 />
               </div>
             </div>
@@ -483,7 +565,209 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
           </div>
         )}
 
-        {/* Step 3: Compliance */}
+        {/* Step 3: Pricing */}
+        {step === "pricing" && (
+          <div className="space-y-6">
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-4 rounded-lg">
+              <div className="flex items-start gap-2">
+                <DollarSign className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-blue-800 dark:text-blue-200">Set Your Pricing</p>
+                  <p className="text-blue-700 dark:text-blue-300 mt-1">
+                    Set competitive prices for each test. The suggested prices are based on market averages.
+                    You can adjust these based on your costs and location.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* In-Center Pricing */}
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <TestTube className="h-5 w-5 text-primary" />
+                <h4 className="font-semibold">In-Center Test Pricing (NGN)</h4>
+              </div>
+
+              <div className="space-y-3">
+                {formData.testPricing.map((tp) => {
+                  const test = getTestById(tp.testStandardId);
+                  if (!test) return null;
+
+                  return (
+                    <Card key={tp.testStandardId} className="p-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium">{test.name}</h4>
+                            {(test as any).isDefault && (
+                              <Badge variant="secondary" className="text-xs">Popular</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground mb-2">{test.description}</p>
+                          <div className="flex flex-wrap gap-1">
+                            {test.testsIncluded.map((item, idx) => (
+                              <Badge key={idx} variant="outline" className="text-xs">
+                                {item}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="w-36">
+                          <Label htmlFor={`price-${tp.testStandardId}`} className="text-xs text-muted-foreground">
+                            In-Center Price (₦)
+                          </Label>
+                          <div className="relative mt-1">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₦</span>
+                            <Input
+                              id={`price-${tp.testStandardId}`}
+                              type="number"
+                              min="0"
+                              step="100"
+                              className="pl-7"
+                              value={tp.price}
+                              onChange={(e) => updateTestPrice(tp.testStandardId, e.target.value)}
+                              data-testid={`input-price-${tp.testStandardId}`}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Suggested: ₦{parseFloat(test.price).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Home Service Option */}
+            <div className="space-y-4">
+              <Card className={`p-4 cursor-pointer transition-all ${
+                formData.offersHomeService ? "ring-2 ring-amber-500 bg-amber-50 dark:bg-amber-950/20" : ""
+              }`} onClick={() => updateField("offersHomeService", !formData.offersHomeService)}>
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    checked={formData.offersHomeService}
+                    onCheckedChange={(checked) => updateField("offersHomeService", !!checked)}
+                    data-testid="checkbox-home-service"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Home className="h-5 w-5 text-amber-600" />
+                      <h4 className="font-semibold">Offer Home Service (Prime)</h4>
+                      <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100">Premium</Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Send phlebotomists to collect samples at patient's location. Home service attracts premium pricing and more patients who value convenience and privacy.
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              {formData.offersHomeService && (
+                <div className="space-y-4 pl-4 border-l-2 border-amber-200 dark:border-amber-800">
+                  {/* Service Radius */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Car className="h-4 w-4 text-amber-600" />
+                      Service Radius
+                    </Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={formData.homeServiceRadius}
+                        onChange={(e) => updateField("homeServiceRadius", e.target.value)}
+                        className="w-24"
+                        data-testid="input-service-radius"
+                      />
+                      <span className="text-sm text-muted-foreground">km from your center</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Maximum distance your team can travel for home sample collection
+                    </p>
+                  </div>
+
+                  {/* Home Service Pricing */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Home className="h-4 w-4 text-amber-600" />
+                      <h5 className="font-medium text-sm">Home Service Pricing</h5>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Set your home service prices (typically 20-50% higher than in-center to cover travel and convenience)
+                    </p>
+
+                    {formData.testPricing.map((tp) => {
+                      const test = getTestById(tp.testStandardId);
+                      if (!test) return null;
+
+                      return (
+                        <div key={`home-${tp.testStandardId}`} className="flex items-center justify-between gap-4 p-3 bg-amber-50/50 dark:bg-amber-950/10 rounded-lg">
+                          <div className="flex-1">
+                            <span className="font-medium text-sm">{test.name}</span>
+                            <p className="text-xs text-muted-foreground">
+                              In-center: ₦{parseFloat(tp.price).toLocaleString()}
+                            </p>
+                          </div>
+                          <div className="w-32">
+                            <Label htmlFor={`home-price-${tp.testStandardId}`} className="text-xs text-muted-foreground">
+                              Home Price (₦)
+                            </Label>
+                            <div className="relative mt-1">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">₦</span>
+                              <Input
+                                id={`home-price-${tp.testStandardId}`}
+                                type="number"
+                                min="0"
+                                step="100"
+                                className="pl-7"
+                                value={tp.homeServicePrice}
+                                onChange={(e) => updateHomeServicePrice(tp.testStandardId, e.target.value)}
+                                data-testid={`input-home-price-${tp.testStandardId}`}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 p-4 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-800 dark:text-amber-200">Pricing Tips</p>
+                  <ul className="mt-1 text-amber-700 dark:text-amber-300 space-y-1">
+                    <li>• Competitive pricing helps attract more patients</li>
+                    <li>• You can update your pricing later from your dashboard</li>
+                    <li>• Prices are shown to patients when they select your center</li>
+                    {formData.offersHomeService && (
+                      <li>• Home service prices should cover travel time and convenience</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-between pt-4">
+              <Button variant="outline" onClick={prevStep}>
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back
+              </Button>
+              <Button onClick={nextStep} data-testid="button-next-step">
+                Continue <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Compliance */}
         {step === "compliance" && (
           <div className="space-y-6">
             <div className="space-y-4">
@@ -615,7 +899,7 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
           </div>
         )}
 
-        {/* Step 4: Review */}
+        {/* Step 5: Review */}
         {step === "review" && (
           <div className="space-y-6">
             <div className="space-y-4">
@@ -653,6 +937,12 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
                     <p className="text-muted-foreground">Role</p>
                     <p className="font-medium">{formData.contactRole}</p>
                   </div>
+                  {formData.operatingHours && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground">Operating Hours</p>
+                      <p className="font-medium">{formData.operatingHours}</p>
+                    </div>
+                  )}
                 </div>
               </Card>
 
@@ -678,6 +968,54 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
                   )}
                 </div>
               </Card>
+
+              <Card className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <DollarSign className="h-5 w-5 text-primary" />
+                  <h4 className="font-semibold">Test Pricing</h4>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <p className="text-xs text-muted-foreground font-medium mb-2">In-Center Pricing:</p>
+                  {formData.testPricing.map((tp) => {
+                    const test = getTestById(tp.testStandardId);
+                    if (!test) return null;
+                    return (
+                      <div key={tp.testStandardId} className="flex justify-between">
+                        <span className="text-muted-foreground">{test.name}</span>
+                        <span className="font-medium">₦{parseFloat(tp.price).toLocaleString()}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </Card>
+
+              {formData.offersHomeService && (
+                <Card className="p-4 border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Home className="h-5 w-5 text-amber-600" />
+                    <h4 className="font-semibold">Home Service (Prime)</h4>
+                    <Badge className="bg-amber-100 text-amber-800 text-xs">Enabled</Badge>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between mb-2">
+                      <span className="text-muted-foreground">Service Radius:</span>
+                      <span className="font-medium">{formData.homeServiceRadius} km</span>
+                    </div>
+                    <Separator className="my-2" />
+                    <p className="text-xs text-muted-foreground font-medium mb-2">Home Service Pricing:</p>
+                    {formData.testPricing.map((tp) => {
+                      const test = getTestById(tp.testStandardId);
+                      if (!test) return null;
+                      return (
+                        <div key={`review-home-${tp.testStandardId}`} className="flex justify-between">
+                          <span className="text-muted-foreground">{test.name}</span>
+                          <span className="font-medium">₦{parseFloat(tp.homeServicePrice).toLocaleString()}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
 
               <Card className="p-4">
                 <div className="flex items-center gap-2 mb-3">
@@ -718,7 +1056,7 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
           </div>
         )}
 
-        {/* Step 5: Submitted */}
+        {/* Step 6: Submitted */}
         {step === "submitted" && (
           <div className="space-y-6 text-center py-4">
             <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center mx-auto">

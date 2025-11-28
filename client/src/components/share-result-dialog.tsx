@@ -8,9 +8,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Clock, Gift, UserCheck, Trash2, AlertCircle, ShieldAlert, MessageCircle } from "lucide-react";
+import { Shield, Clock, Gift, UserCheck, Trash2, AlertCircle, ShieldAlert, MessageCircle, Heart, MapPin, Pill, Phone } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
 
 interface ShareResultDialogProps {
   open: boolean;
@@ -115,7 +116,7 @@ export function ShareResultDialog({ open, onOpenChange, resultId, sponsorInfo }:
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Share Test Results</DialogTitle>
           <DialogDescription>
@@ -124,15 +125,19 @@ export function ShareResultDialog({ open, onOpenChange, resultId, sponsorInfo }:
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="share">Share Results</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="share">Share</TabsTrigger>
             <TabsTrigger value="manage">
-              Manage Access
+              Manage
               {(activeShares.length > 0 || sponsorShared) && (
-                <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 justify-center">
+                <Badge variant="secondary" className="ml-1 h-5 w-5 p-0 justify-center text-xs">
                   {activeShares.length + (sponsorShared ? 1 : 0)}
                 </Badge>
               )}
+            </TabsTrigger>
+            <TabsTrigger value="resources">
+              <Heart className="h-3 w-3 mr-1" />
+              Resources
             </TabsTrigger>
           </TabsList>
 
@@ -407,6 +412,141 @@ export function ShareResultDialog({ open, onOpenChange, resultId, sponsorInfo }:
                     Click the trash icon to immediately revoke access. The recipient will no longer
                     be able to view your results.
                   </p>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Safer Sex Resources Tab */}
+          <TabsContent value="resources" className="space-y-4 mt-4">
+            <div className="text-center mb-4">
+              <Heart className="h-8 w-8 text-primary mx-auto mb-2" />
+              <h3 className="font-semibold">Sexual Wellness Resources</h3>
+              <p className="text-sm text-muted-foreground">
+                Stay informed and protect your health
+              </p>
+            </div>
+
+            {/* Safer Sex Options */}
+            <Card className="p-4">
+              <h4 className="font-semibold flex items-center gap-2 mb-3">
+                <Shield className="h-5 w-5 text-primary" />
+                Safer Sex Options
+              </h4>
+              <div className="space-y-3">
+                <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                    <Pill className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Condoms & Protection</p>
+                    <p className="text-xs text-muted-foreground">
+                      Find where to get free condoms near you
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <MapPin className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+                  <div className="p-2 bg-purple-100 dark:bg-purple-900 rounded-full">
+                    <Pill className="h-4 w-4 text-purple-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Emergency Contraception</p>
+                    <p className="text-xs text-muted-foreground">
+                      Information about emergency contraception options
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <MapPin className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                <Separator />
+
+                <div className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 cursor-pointer">
+                  <div className="p-2 bg-green-100 dark:bg-green-900 rounded-full">
+                    <MapPin className="h-4 w-4 text-green-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">Pharmacy Locator</p>
+                    <p className="text-xs text-muted-foreground">
+                      Find pharmacies near you for sexual health products
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="sm">
+                    <MapPin className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* PrEP/PEP Information */}
+            <Card className="p-4">
+              <h4 className="font-semibold flex items-center gap-2 mb-3">
+                <Pill className="h-5 w-5 text-primary" />
+                HIV Prevention
+              </h4>
+              <div className="space-y-3 text-sm">
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="font-medium mb-1">PrEP (Pre-Exposure Prophylaxis)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Daily medication that can reduce HIV risk by up to 99% when taken as prescribed.
+                  </p>
+                  <Button variant="link" size="sm" className="p-0 h-auto mt-2">
+                    Learn more about PrEP
+                  </Button>
+                </div>
+                <div className="p-3 bg-muted/50 rounded-lg">
+                  <p className="font-medium mb-1">PEP (Post-Exposure Prophylaxis)</p>
+                  <p className="text-xs text-muted-foreground">
+                    Emergency treatment taken within 72 hours of potential HIV exposure.
+                  </p>
+                  <Button variant="link" size="sm" className="p-0 h-auto mt-2">
+                    Learn more about PEP
+                  </Button>
+                </div>
+              </div>
+            </Card>
+
+            {/* Emergency Hotlines */}
+            <Card className="p-4 border-rose-200 bg-rose-50 dark:bg-rose-950/20">
+              <h4 className="font-semibold flex items-center gap-2 mb-3 text-rose-800 dark:text-rose-200">
+                <Phone className="h-5 w-5" />
+                Need to Talk?
+              </h4>
+              <div className="space-y-2 text-sm">
+                <Button variant="outline" className="w-full justify-start border-rose-300 text-rose-700 hover:bg-rose-100">
+                  <Phone className="h-4 w-4 mr-2" />
+                  HIV/AIDS Helpline
+                </Button>
+                <Button variant="outline" className="w-full justify-start border-rose-300 text-rose-700 hover:bg-rose-100">
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Sexual Health Counselor
+                </Button>
+              </div>
+              <p className="text-xs text-rose-600 dark:text-rose-400 mt-3">
+                All calls and chats are confidential
+              </p>
+            </Card>
+
+            {/* Safety Resources */}
+            <div className="p-4 border rounded-lg bg-card">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="h-5 w-5 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-sm mb-1">Feeling Unsafe?</p>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    If you're in a situation where you feel pressured about your sexual health decisions,
+                    or if you're experiencing relationship violence, help is available.
+                  </p>
+                  <Button variant="link" size="sm" className="p-0 h-auto text-amber-600">
+                    Access Confidential Support
+                  </Button>
                 </div>
               </div>
             </div>

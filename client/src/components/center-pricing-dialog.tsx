@@ -24,7 +24,8 @@ interface TestService {
   name: string;
   price: string;
   enabled: boolean;
-  turnaround: string;
+  turnaroundHours: number;
+  isCustom?: boolean;
 }
 
 interface TestPackage {
@@ -33,17 +34,19 @@ interface TestPackage {
   price: string;
   tests: string[];
   enabled: boolean;
+  turnaroundHours: number;
+  isCustom?: boolean;
 }
 
 // Mock data for center's current pricing
 const initialServices: TestService[] = [
-  { id: "s1", name: "HIV 1&2 Antibody Test", price: "3500", enabled: true, turnaround: "24 hours" },
-  { id: "s2", name: "Hepatitis B Surface Antigen", price: "3000", enabled: true, turnaround: "24 hours" },
-  { id: "s3", name: "Hepatitis C Antibody", price: "3000", enabled: true, turnaround: "24 hours" },
-  { id: "s4", name: "Syphilis VDRL", price: "2500", enabled: true, turnaround: "24 hours" },
-  { id: "s5", name: "Gonorrhea PCR", price: "4500", enabled: true, turnaround: "48 hours" },
-  { id: "s6", name: "Chlamydia PCR", price: "4500", enabled: true, turnaround: "48 hours" },
-  { id: "s7", name: "Herpes HSV 1&2", price: "5000", enabled: false, turnaround: "48 hours" },
+  { id: "s1", name: "HIV 1&2 Antibody Test", price: "3500", enabled: true, turnaroundHours: 24 },
+  { id: "s2", name: "Hepatitis B Surface Antigen", price: "3000", enabled: true, turnaroundHours: 24 },
+  { id: "s3", name: "Hepatitis C Antibody", price: "3000", enabled: true, turnaroundHours: 24 },
+  { id: "s4", name: "Syphilis VDRL", price: "2500", enabled: true, turnaroundHours: 24 },
+  { id: "s5", name: "Gonorrhea PCR", price: "4500", enabled: true, turnaroundHours: 48 },
+  { id: "s6", name: "Chlamydia PCR", price: "4500", enabled: true, turnaroundHours: 48 },
+  { id: "s7", name: "Herpes HSV 1&2", price: "5000", enabled: false, turnaroundHours: 48 },
 ];
 
 const initialPackages: TestPackage[] = [
@@ -53,6 +56,7 @@ const initialPackages: TestPackage[] = [
     price: "12500",
     tests: ["HIV 1&2", "Hepatitis B", "Hepatitis C", "Syphilis", "Gonorrhea", "Chlamydia"],
     enabled: true,
+    turnaroundHours: 48,
   },
   {
     id: "p2",
@@ -60,6 +64,7 @@ const initialPackages: TestPackage[] = [
     price: "7500",
     tests: ["HIV 1&2", "Hepatitis B", "Hepatitis C"],
     enabled: true,
+    turnaroundHours: 24,
   },
   {
     id: "p3",
@@ -67,6 +72,7 @@ const initialPackages: TestPackage[] = [
     price: "5000",
     tests: ["Gonorrhea", "Chlamydia", "Syphilis"],
     enabled: true,
+    turnaroundHours: 48,
   },
 ];
 
@@ -87,6 +93,34 @@ export function CenterPricingDialog({ open, onOpenChange }: CenterPricingDialogP
     setHasChanges(true);
   };
 
+  const handleServiceTurnaroundChange = (id: string, hours: number) => {
+    setServices(services.map(s => s.id === id ? { ...s, turnaroundHours: hours } : s));
+    setHasChanges(true);
+  };
+
+  const handleServiceNameChange = (id: string, name: string) => {
+    setServices(services.map(s => s.id === id ? { ...s, name } : s));
+    setHasChanges(true);
+  };
+
+  const handleAddService = () => {
+    const newService: TestService = {
+      id: `s-${Date.now()}`,
+      name: "",
+      price: "0",
+      enabled: true,
+      turnaroundHours: 24,
+      isCustom: true,
+    };
+    setServices([...services, newService]);
+    setHasChanges(true);
+  };
+
+  const handleDeleteService = (id: string) => {
+    setServices(services.filter(s => s.id !== id));
+    setHasChanges(true);
+  };
+
   const handlePackagePriceChange = (id: string, price: string) => {
     setPackages(packages.map(p => p.id === id ? { ...p, price } : p));
     setHasChanges(true);
@@ -94,6 +128,41 @@ export function CenterPricingDialog({ open, onOpenChange }: CenterPricingDialogP
 
   const handlePackageToggle = (id: string) => {
     setPackages(packages.map(p => p.id === id ? { ...p, enabled: !p.enabled } : p));
+    setHasChanges(true);
+  };
+
+  const handlePackageNameChange = (id: string, name: string) => {
+    setPackages(packages.map(p => p.id === id ? { ...p, name } : p));
+    setHasChanges(true);
+  };
+
+  const handlePackageTurnaroundChange = (id: string, hours: number) => {
+    setPackages(packages.map(p => p.id === id ? { ...p, turnaroundHours: hours } : p));
+    setHasChanges(true);
+  };
+
+  const handlePackageTestsChange = (id: string, testsString: string) => {
+    const tests = testsString.split(',').map(t => t.trim()).filter(t => t);
+    setPackages(packages.map(p => p.id === id ? { ...p, tests } : p));
+    setHasChanges(true);
+  };
+
+  const handleAddPackage = () => {
+    const newPackage: TestPackage = {
+      id: `p-${Date.now()}`,
+      name: "",
+      price: "0",
+      tests: [],
+      enabled: true,
+      turnaroundHours: 24,
+      isCustom: true,
+    };
+    setPackages([...packages, newPackage]);
+    setHasChanges(true);
+  };
+
+  const handleDeletePackage = (id: string) => {
+    setPackages(packages.filter(p => p.id !== id));
     setHasChanges(true);
   };
 
@@ -145,30 +214,69 @@ export function CenterPricingDialog({ open, onOpenChange }: CenterPricingDialogP
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium">{service.name}</h4>
-                        <Badge variant="secondary" className="text-xs">
-                          {service.turnaround}
-                        </Badge>
-                      </div>
+                      {service.isCustom ? (
+                        <Input
+                          value={service.name}
+                          onChange={(e) => handleServiceNameChange(service.id, e.target.value)}
+                          placeholder="Enter test name"
+                          className="font-medium mb-2"
+                          disabled={!service.enabled}
+                        />
+                      ) : (
+                        <h4 className="font-medium mb-2">{service.name}</h4>
+                      )}
                     </div>
-                    <Switch
-                      checked={service.enabled}
-                      onCheckedChange={() => handleServiceToggle(service.id)}
-                    />
+                    <div className="flex items-center gap-2">
+                      {service.isCustom && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDeleteService(service.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Switch
+                        checked={service.enabled}
+                        onCheckedChange={() => handleServiceToggle(service.id)}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <Label className="text-sm text-muted-foreground">Price (₦)</Label>
-                    <Input
-                      type="number"
-                      value={service.price}
-                      onChange={(e) => handleServicePriceChange(service.id, e.target.value)}
-                      className="w-32 font-mono"
-                      disabled={!service.enabled}
-                    />
+                  <div className="flex flex-wrap items-center gap-4 mt-2">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-muted-foreground whitespace-nowrap">Price (₦)</Label>
+                      <Input
+                        type="number"
+                        value={service.price}
+                        onChange={(e) => handleServicePriceChange(service.id, e.target.value)}
+                        className="w-28 font-mono"
+                        disabled={!service.enabled}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-muted-foreground whitespace-nowrap">Turnaround</Label>
+                      <Input
+                        type="number"
+                        value={service.turnaroundHours}
+                        onChange={(e) => handleServiceTurnaroundChange(service.id, parseInt(e.target.value) || 0)}
+                        className="w-20 font-mono"
+                        disabled={!service.enabled}
+                        min={1}
+                      />
+                      <span className="text-sm text-muted-foreground">hours</span>
+                    </div>
                   </div>
                 </div>
               ))}
+              <Button
+                variant="outline"
+                className="w-full border-dashed"
+                onClick={handleAddService}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Test
+              </Button>
             </div>
           )}
 
@@ -181,32 +289,89 @@ export function CenterPricingDialog({ open, onOpenChange }: CenterPricingDialogP
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <h4 className="font-medium mb-2">{pkg.name}</h4>
-                      <div className="flex flex-wrap gap-1">
-                        {pkg.tests.map((test, idx) => (
-                          <Badge key={idx} variant="outline" className="text-xs">
-                            {test}
-                          </Badge>
-                        ))}
-                      </div>
+                      {pkg.isCustom ? (
+                        <Input
+                          value={pkg.name}
+                          onChange={(e) => handlePackageNameChange(pkg.id, e.target.value)}
+                          placeholder="Enter package name"
+                          className="font-medium mb-2"
+                          disabled={!pkg.enabled}
+                        />
+                      ) : (
+                        <h4 className="font-medium mb-2">{pkg.name}</h4>
+                      )}
+                      {pkg.isCustom ? (
+                        <div className="space-y-1">
+                          <Label className="text-xs text-muted-foreground">Tests (comma separated)</Label>
+                          <Input
+                            value={pkg.tests.join(', ')}
+                            onChange={(e) => handlePackageTestsChange(pkg.id, e.target.value)}
+                            placeholder="e.g., HIV 1&2, Hepatitis B, Syphilis"
+                            className="text-sm"
+                            disabled={!pkg.enabled}
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex flex-wrap gap-1">
+                          {pkg.tests.map((test, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {test}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <Switch
-                      checked={pkg.enabled}
-                      onCheckedChange={() => handlePackageToggle(pkg.id)}
-                    />
+                    <div className="flex items-center gap-2">
+                      {pkg.isCustom && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => handleDeletePackage(pkg.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      <Switch
+                        checked={pkg.enabled}
+                        onCheckedChange={() => handlePackageToggle(pkg.id)}
+                      />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 mt-3">
-                    <Label className="text-sm text-muted-foreground">Package Price (₦)</Label>
-                    <Input
-                      type="number"
-                      value={pkg.price}
-                      onChange={(e) => handlePackagePriceChange(pkg.id, e.target.value)}
-                      className="w-32 font-mono"
-                      disabled={!pkg.enabled}
-                    />
+                  <div className="flex flex-wrap items-center gap-4 mt-3">
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-muted-foreground whitespace-nowrap">Price (₦)</Label>
+                      <Input
+                        type="number"
+                        value={pkg.price}
+                        onChange={(e) => handlePackagePriceChange(pkg.id, e.target.value)}
+                        className="w-28 font-mono"
+                        disabled={!pkg.enabled}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-sm text-muted-foreground whitespace-nowrap">Turnaround</Label>
+                      <Input
+                        type="number"
+                        value={pkg.turnaroundHours}
+                        onChange={(e) => handlePackageTurnaroundChange(pkg.id, parseInt(e.target.value) || 0)}
+                        className="w-20 font-mono"
+                        disabled={!pkg.enabled}
+                        min={1}
+                      />
+                      <span className="text-sm text-muted-foreground">hours</span>
+                    </div>
                   </div>
                 </div>
               ))}
+              <Button
+                variant="outline"
+                className="w-full border-dashed"
+                onClick={handleAddPackage}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Package
+              </Button>
             </div>
           )}
         </div>

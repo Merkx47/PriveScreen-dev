@@ -6,9 +6,12 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { CheckCircle2, User, FileText, Calendar, ShieldCheck, Fingerprint, CreditCard, Loader2 } from "lucide-react";
+import { CheckCircle2, User, FileText, Calendar, ShieldCheck, Fingerprint, CreditCard, Loader2, Car, Vote, Plane, AlertCircle, Droplets, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { mockCodeValidation } from "@/lib/mock-data";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 
 interface ValidateCodeDialogProps {
   open: boolean;
@@ -16,24 +19,34 @@ interface ValidateCodeDialogProps {
   code: string;
 }
 
-type VerificationStep = "code_valid" | "identity_verification" | "verified";
+type VerificationStep = "code_valid" | "pre_test_instructions" | "identity_verification" | "consent" | "verified";
+type IdType = "bvn" | "nin" | "passport" | "national_id" | "voters_card" | "drivers_license";
 
 export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDialogProps) {
   const { toast } = useToast();
   const codeData = mockCodeValidation;
 
   const [step, setStep] = useState<VerificationStep>("code_valid");
-  const [idType, setIdType] = useState<"bvn" | "nin" | "govt_id">("bvn");
+  const [idType, setIdType] = useState<IdType>("bvn");
   const [idNumber, setIdNumber] = useState("");
   const [isVerifying, setIsVerifying] = useState(false);
+  const [consentGiven, setConsentGiven] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{
     verified: boolean;
     name: string;
     matchScore: number;
   } | null>(null);
 
+  const handleProceedToPreTest = () => {
+    setStep("pre_test_instructions");
+  };
+
   const handleProceedToVerification = () => {
     setStep("identity_verification");
+  };
+
+  const handleProceedToConsent = () => {
+    setStep("consent");
   };
 
   const handleVerifyIdentity = async () => {
@@ -78,6 +91,18 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
     });
 
     setIsVerifying(false);
+    setStep("consent");
+  };
+
+  const handleFinalConfirm = () => {
+    if (!consentGiven) {
+      toast({
+        title: "Consent Required",
+        description: "Patient must consent to medical data processing",
+        variant: "destructive",
+      });
+      return;
+    }
     setStep("verified");
   };
 
@@ -91,6 +116,7 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
     setStep("code_valid");
     setIdNumber("");
     setVerificationResult(null);
+    setConsentGiven(false);
   };
 
   const handleClose = () => {
@@ -99,13 +125,17 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
     setStep("code_valid");
     setIdNumber("");
     setVerificationResult(null);
+    setConsentGiven(false);
   };
 
   const getIdLabel = () => {
     switch (idType) {
       case "bvn": return "Bank Verification Number (BVN)";
       case "nin": return "National Identification Number (NIN)";
-      case "govt_id": return "Government ID Number";
+      case "passport": return "International Passport Number";
+      case "national_id": return "National ID Card Number";
+      case "voters_card": return "Voter's Card Number";
+      case "drivers_license": return "Driver's License Number";
     }
   };
 
@@ -113,7 +143,20 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
     switch (idType) {
       case "bvn": return "22012345678";
       case "nin": return "12345678901";
-      case "govt_id": return "A12345678";
+      case "passport": return "A12345678";
+      case "national_id": return "NGA-123456789";
+      case "voters_card": return "12AB34CD567890";
+      case "drivers_license": return "ABC12345DE67";
+    }
+  };
+
+  const getMaxLength = () => {
+    switch (idType) {
+      case "bvn":
+      case "nin":
+        return 11;
+      default:
+        return 20;
     }
   };
 
@@ -123,12 +166,16 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
         <DialogHeader>
           <DialogTitle>
             {step === "code_valid" && "Assessment Code Validation"}
+            {step === "pre_test_instructions" && "Pre-Test Instructions"}
             {step === "identity_verification" && "Identity Verification"}
+            {step === "consent" && "Patient Consent"}
             {step === "verified" && "Verification Complete"}
           </DialogTitle>
           <DialogDescription>
-            {step === "code_valid" && "Code validated successfully. Proceed to verify patient identity."}
-            {step === "identity_verification" && "Verify patient identity using BVN, NIN, or government-issued ID"}
+            {step === "code_valid" && "Code validated successfully. Review details before proceeding."}
+            {step === "pre_test_instructions" && "Important instructions to share with the patient before sample collection."}
+            {step === "identity_verification" && "Verify patient identity using government-issued ID"}
+            {step === "consent" && "Patient must consent to medical data processing"}
             {step === "verified" && "Patient identity has been verified successfully"}
           </DialogDescription>
         </DialogHeader>
@@ -186,14 +233,74 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
               </div>
             </div>
 
-            <Button onClick={handleProceedToVerification} className="w-full" data-testid="button-proceed-verify">
-              <Fingerprint className="h-4 w-4 mr-2" />
-              Proceed to Identity Verification
+            <Button onClick={handleProceedToPreTest} className="w-full" data-testid="button-proceed-pretest">
+              <FileText className="h-4 w-4 mr-2" />
+              View Pre-Test Instructions
             </Button>
           </div>
         )}
 
-        {/* Step 2: Identity Verification */}
+        {/* Step 2: Pre-Test Instructions */}
+        {step === "pre_test_instructions" && (
+          <div className="space-y-6">
+            <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 dark:text-blue-200">
+                Please share these instructions with the patient before sample collection.
+              </AlertDescription>
+            </Alert>
+
+            <div className="space-y-4">
+              <div className="p-4 border rounded-lg space-y-3">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Droplets className="h-5 w-5 text-primary" />
+                  Blood Sample Collection
+                </h4>
+                <ul className="text-sm text-muted-foreground space-y-2 ml-7">
+                  <li>• Patient does not need to fast for STI tests</li>
+                  <li>• Ensure patient is hydrated for easier blood draw</li>
+                  <li>• If patient is anxious, allow them to sit and relax first</li>
+                </ul>
+              </div>
+
+              <div className="p-4 border rounded-lg space-y-3">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <Clock className="h-5 w-5 text-primary" />
+                  HIV Window Period Advisory
+                </h4>
+                <ul className="text-sm text-muted-foreground space-y-2 ml-7">
+                  <li>• Standard HIV antibody tests have a 3-month window period</li>
+                  <li>• For recent exposure (within 10-14 days), recommend P24/RNA test</li>
+                  <li>• Advise patient to retest after window period if initial test is negative</li>
+                </ul>
+              </div>
+
+              <div className="p-4 border rounded-lg space-y-3">
+                <h4 className="font-semibold flex items-center gap-2">
+                  <ShieldCheck className="h-5 w-5 text-primary" />
+                  Privacy Reminders
+                </h4>
+                <ul className="text-sm text-muted-foreground space-y-2 ml-7">
+                  <li>• Results will be available anonymously in the patient's app</li>
+                  <li>• Patient name will not appear on the final report</li>
+                  <li>• Only the patient controls who can see their results</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setStep("code_valid")} className="flex-1">
+                Back
+              </Button>
+              <Button onClick={handleProceedToVerification} className="flex-1" data-testid="button-proceed-verify">
+                <Fingerprint className="h-4 w-4 mr-2" />
+                Proceed to Verification
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Identity Verification */}
         {step === "identity_verification" && (
           <div className="space-y-6">
             <Card className="p-4 bg-muted/30">
@@ -208,9 +315,12 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
 
             <div className="space-y-4">
               <div className="space-y-3">
-                <Label>Verification Method</Label>
-                <RadioGroup value={idType} onValueChange={(v) => setIdType(v as "bvn" | "nin" | "govt_id")}>
-                  <div className="grid grid-cols-1 gap-3">
+                <Label>Select ID Type</Label>
+                <RadioGroup value={idType} onValueChange={(v) => setIdType(v as IdType)}>
+                  <div className="grid grid-cols-1 gap-2">
+                    {/* Digital Verification Options */}
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Digital Verification (Instant)</p>
+
                     <Card
                       className={`p-3 cursor-pointer transition-all ${
                         idType === "bvn" ? "ring-2 ring-primary border-primary" : "hover:border-primary/50"
@@ -222,11 +332,11 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
                         <div className="flex items-center gap-2 flex-1">
                           <CreditCard className="h-5 w-5 text-green-600" />
                           <div>
-                            <Label htmlFor="bvn" className="font-medium cursor-pointer">BVN Verification</Label>
-                            <p className="text-xs text-muted-foreground">Bank Verification Number (Recommended)</p>
+                            <Label htmlFor="bvn" className="font-medium cursor-pointer">BVN</Label>
+                            <p className="text-xs text-muted-foreground">Bank Verification Number</p>
                           </div>
                         </div>
-                        <Badge variant="secondary" className="text-xs">Instant</Badge>
+                        <Badge variant="default" className="text-xs bg-green-600">Recommended</Badge>
                       </div>
                     </Card>
 
@@ -241,7 +351,7 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
                         <div className="flex items-center gap-2 flex-1">
                           <Fingerprint className="h-5 w-5 text-blue-600" />
                           <div>
-                            <Label htmlFor="nin" className="font-medium cursor-pointer">NIN Verification</Label>
+                            <Label htmlFor="nin" className="font-medium cursor-pointer">NIN</Label>
                             <p className="text-xs text-muted-foreground">National Identification Number</p>
                           </div>
                         </div>
@@ -249,22 +359,76 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
                       </div>
                     </Card>
 
+                    <Separator className="my-2" />
+
+                    {/* Physical ID Options */}
+                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Physical ID (Manual Verification)</p>
+
                     <Card
                       className={`p-3 cursor-pointer transition-all ${
-                        idType === "govt_id" ? "ring-2 ring-primary border-primary" : "hover:border-primary/50"
+                        idType === "passport" ? "ring-2 ring-primary border-primary" : "hover:border-primary/50"
                       }`}
-                      onClick={() => setIdType("govt_id")}
+                      onClick={() => setIdType("passport")}
                     >
                       <div className="flex items-center gap-3">
-                        <RadioGroupItem value="govt_id" id="govt_id" />
+                        <RadioGroupItem value="passport" id="passport" />
                         <div className="flex items-center gap-2 flex-1">
-                          <FileText className="h-5 w-5 text-orange-600" />
+                          <Plane className="h-5 w-5 text-purple-600" />
                           <div>
-                            <Label htmlFor="govt_id" className="font-medium cursor-pointer">Government ID</Label>
-                            <p className="text-xs text-muted-foreground">Driver's License, Voter's Card, Int'l Passport</p>
+                            <Label htmlFor="passport" className="font-medium cursor-pointer">International Passport</Label>
                           </div>
                         </div>
-                        <Badge variant="outline" className="text-xs">Manual</Badge>
+                      </div>
+                    </Card>
+
+                    <Card
+                      className={`p-3 cursor-pointer transition-all ${
+                        idType === "national_id" ? "ring-2 ring-primary border-primary" : "hover:border-primary/50"
+                      }`}
+                      onClick={() => setIdType("national_id")}
+                    >
+                      <div className="flex items-center gap-3">
+                        <RadioGroupItem value="national_id" id="national_id" />
+                        <div className="flex items-center gap-2 flex-1">
+                          <CreditCard className="h-5 w-5 text-blue-600" />
+                          <div>
+                            <Label htmlFor="national_id" className="font-medium cursor-pointer">National ID Card</Label>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card
+                      className={`p-3 cursor-pointer transition-all ${
+                        idType === "voters_card" ? "ring-2 ring-primary border-primary" : "hover:border-primary/50"
+                      }`}
+                      onClick={() => setIdType("voters_card")}
+                    >
+                      <div className="flex items-center gap-3">
+                        <RadioGroupItem value="voters_card" id="voters_card" />
+                        <div className="flex items-center gap-2 flex-1">
+                          <Vote className="h-5 w-5 text-orange-600" />
+                          <div>
+                            <Label htmlFor="voters_card" className="font-medium cursor-pointer">Voter's Card</Label>
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+
+                    <Card
+                      className={`p-3 cursor-pointer transition-all ${
+                        idType === "drivers_license" ? "ring-2 ring-primary border-primary" : "hover:border-primary/50"
+                      }`}
+                      onClick={() => setIdType("drivers_license")}
+                    >
+                      <div className="flex items-center gap-3">
+                        <RadioGroupItem value="drivers_license" id="drivers_license" />
+                        <div className="flex items-center gap-2 flex-1">
+                          <Car className="h-5 w-5 text-teal-600" />
+                          <div>
+                            <Label htmlFor="drivers_license" className="font-medium cursor-pointer">Driver's License</Label>
+                          </div>
+                        </div>
                       </div>
                     </Card>
                   </div>
@@ -277,8 +441,13 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
                   id="idNumber"
                   placeholder={getIdPlaceholder()}
                   value={idNumber}
-                  onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                  maxLength={idType === "govt_id" ? 20 : 11}
+                  onChange={(e) => {
+                    const val = idType === "bvn" || idType === "nin"
+                      ? e.target.value.replace(/\D/g, '').slice(0, 11)
+                      : e.target.value.slice(0, 20);
+                    setIdNumber(val);
+                  }}
+                  maxLength={getMaxLength()}
                   data-testid="input-id-number"
                 />
                 {(idType === "bvn" || idType === "nin") && (
@@ -298,7 +467,7 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
             </div>
 
             <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setStep("code_valid")} className="flex-1">
+              <Button variant="outline" onClick={() => setStep("pre_test_instructions")} className="flex-1">
                 Back
               </Button>
               <Button
@@ -318,6 +487,72 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
                     Verify Identity
                   </>
                 )}
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 4: Consent */}
+        {step === "consent" && verificationResult && (
+          <div className="space-y-6">
+            <Card className="p-4 bg-green-50 dark:bg-green-950/30 border-green-200">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+                <div>
+                  <p className="text-sm text-green-800 dark:text-green-200 font-medium">Identity Verified</p>
+                  <p className="text-sm text-green-700 dark:text-green-300">{verificationResult.name}</p>
+                </div>
+              </div>
+            </Card>
+
+            <div className="space-y-4">
+              <h4 className="font-semibold">Patient Consent Required</h4>
+              <p className="text-sm text-muted-foreground">
+                Before proceeding with sample collection, the patient must provide verbal consent to the following:
+              </p>
+
+              <div className="p-4 border rounded-lg space-y-3 bg-card">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="consent"
+                    checked={consentGiven}
+                    onCheckedChange={(checked) => setConsentGiven(checked as boolean)}
+                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="consent" className="font-medium cursor-pointer leading-relaxed">
+                      I confirm the patient has verbally consented to:
+                    </Label>
+                    <ul className="text-sm text-muted-foreground space-y-1 ml-4">
+                      <li>• Having their sample collected and tested</li>
+                      <li>• Their medical data being processed by PriveScreen</li>
+                      <li>• Receiving results through the PriveScreen platform</li>
+                      <li>• Understanding that results are stored anonymously</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+                <ShieldCheck className="h-4 w-4 text-blue-600" />
+                <AlertDescription className="text-blue-800 dark:text-blue-200 text-sm">
+                  This consent is recorded for compliance purposes. The patient can revoke access to their
+                  results at any time through their PriveScreen account.
+                </AlertDescription>
+              </Alert>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={() => setStep("identity_verification")} className="flex-1">
+                Back
+              </Button>
+              <Button
+                onClick={handleFinalConfirm}
+                disabled={!consentGiven}
+                className="flex-1"
+                data-testid="button-confirm-consent"
+              >
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+                Confirm & Proceed
               </Button>
             </div>
           </div>
