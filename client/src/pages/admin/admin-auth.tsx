@@ -27,7 +27,7 @@ export default function AdminAuth() {
 
   // OTP state
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [otpExpiry, setOtpExpiry] = useState(300); // 5 minutes in seconds
+  const [otpExpiry, setOtpExpiry] = useState(900); // 15 minutes in seconds
   const [canResend, setCanResend] = useState(false);
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -126,7 +126,7 @@ export default function AdminAuth() {
           description: response.data.message || "A 6-digit code has been sent to your email",
         });
         setAuthStep("otp");
-        setOtpExpiry(300); // Reset timer
+        setOtpExpiry(900); // Reset timer to 15 minutes
         setCanResend(false);
         setOtp(["", "", "", "", "", ""]);
 
@@ -224,7 +224,7 @@ export default function AdminAuth() {
           title: "Code Resent",
           description: "A new verification code has been sent to your email",
         });
-        setOtpExpiry(300);
+        setOtpExpiry(900); // Reset timer to 15 minutes
         setCanResend(false);
         setOtp(["", "", "", "", "", ""]);
         otpInputRefs.current[0]?.focus();
@@ -250,7 +250,7 @@ export default function AdminAuth() {
   const handleBackToLogin = () => {
     setAuthStep("credentials");
     setOtp(["", "", "", "", "", ""]);
-    setOtpExpiry(300);
+    setOtpExpiry(900); // Reset timer to 15 minutes
   };
 
   const handleSignup = async (e: React.FormEvent) => {
