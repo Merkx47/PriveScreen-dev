@@ -3,52 +3,96 @@ import { useRoute, useSearch } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Download, Share2, ArrowLeft, CheckCircle2, AlertCircle, XCircle, Eye, Shield, Lock, Phone, MessageCircle, Calendar, Clock, Info, Stethoscope } from "lucide-react";
-import { mockTestResults, mockDiagnosticCenters, mockTestStandards, mockAssessmentCodes } from "@/lib/mock-data";
+import { Download, Share2, ArrowLeft, CheckCircle2, AlertCircle, XCircle, Eye, Shield, Lock, Phone, MessageCircle, Calendar, Clock, Info, Stethoscope, Loader2 } from "lucide-react";
 import { PriveScreenLogo } from "@/components/logo";
 import { ShareResultDialog } from "@/components/share-result-dialog";
 import { format, addDays } from "date-fns";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getResultById, type TestResult } from "@/lib/api/results";
 
 export default function ResultDetail() {
   const [, params] = useRoute("/results/:id");
   const searchString = useSearch();
   const [showShare, setShowShare] = useState(false);
   const [hasViewedResults, setHasViewedResults] = useState(false);
+  const [result, setResult] = useState<TestResult | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Check if viewing as sponsor (from URL query param)
   const isSponsorView = searchString.includes("view=sponsor");
 
-  const result = mockTestResults.find(r => r.id === params?.id);
-  const center = result ? mockDiagnosticCenters.find(c => c.id === result.diagnosticCenterId) : null;
-  const testStandard = result ? mockTestStandards.find(t => t.id === result.testStandardId) : null;
+  // Fetch result data
+  useEffect(() => {
+    const fetchResult = async () => {
+      if (!params?.id) return;
 
-  // Find if this result was from a sponsored test
-  const assessmentCode = result ? mockAssessmentCodes.find(c => c.id === result.assessmentCodeId) : null;
-  const sponsorInfo = assessmentCode && assessmentCode.sponsorType !== "self" ? {
-    name: assessmentCode.sponsorType === "employer" ? "Your Employer" : "Anonymous Sponsor",
-    type: assessmentCode.sponsorType,
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await getResultById(params.id);
+        if (response.success && response.data) {
+          setResult(response.data);
+          // Mark as viewed
+          if (!response.data.viewed) {
+            setHasViewedResults(true);
+          } else {
+            setHasViewedResults(true);
+          }
+        } else {
+          setError(response.error || "Failed to load result");
+        }
+      } catch (err) {
+        console.error("Failed to fetch result:", err);
+        setError("Unable to load result. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchResult();
+  }, [params?.id]);
+
+  // Get related data from result
+  const center = result?.diagnosticCenter;
+  const testStandard = result?.testStandard;
+
+  // Determine sponsor info from assessment code
+  const sponsorType = result?.assessmentCode ? "sponsor" : undefined;
+  const sponsorInfo = sponsorType ? {
+    name: "Your Sponsor",
+    type: sponsorType,
   } : undefined;
 
-  // Mark results as viewed when patient opens this page (Phase 5: Patient views results first)
-  useEffect(() => {
-    if (result && !result.viewed) {
-      // In a real app, this would call an API to mark as viewed
-      setHasViewedResults(true);
-    } else if (result?.viewed) {
-      setHasViewedResults(true);
-    }
-  }, [result]);
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="pt-6 text-center">
+            <Loader2 className="h-12 w-12 mx-auto mb-3 text-primary animate-spin" />
+            <h2 className="text-xl font-semibold mb-2">Loading Results...</h2>
+            <p className="text-muted-foreground">Please wait while we fetch your test results</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
-  if (!result) {
+  // Error or not found state
+  if (error || !result) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md">
           <CardContent className="pt-6 text-center">
             <XCircle className="h-12 w-12 mx-auto mb-3 text-destructive" />
-            <h2 className="text-xl font-semibold mb-2">Result Not Found</h2>
-            <p className="text-muted-foreground mb-4">This test result does not exist</p>
+            <h2 className="text-xl font-semibold mb-2">
+              {error ? "Error Loading Result" : "Result Not Found"}
+            </h2>
+            <p className="text-muted-foreground mb-4">
+              {error || "This test result does not exist"}
+            </p>
             <Button asChild>
               <a href="/">Go Home</a>
             </Button>

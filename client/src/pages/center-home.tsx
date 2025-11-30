@@ -1,10 +1,12 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Search,
   CheckCircle2,
@@ -17,37 +19,63 @@ import {
   Award,
   ArrowDownToLine,
   Clock,
-  FileText
+  FileText,
+  LogOut
 } from "lucide-react";
 import { ValidateCodeDialog } from "@/components/validate-code-dialog";
 import { CenterPricingDialog } from "@/components/center-pricing-dialog";
 import { WithdrawDialog } from "@/components/withdraw-dialog";
 import { PriveScreenLogo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
-import {
-  mockCenterTests,
-  mockCenterWallet,
-  mockCenterRevenue,
-  mockCenterWithdrawals,
-  type CenterRevenueItem
-} from "@/lib/mock-data";
+import { useCurrentUser, useMyCenter, useCenterResults, useLogout } from "@/lib/api/hooks";
+import { getAuthToken } from "@/lib/api/config";
+
+type RevenueType = 'test' | 'home_service' | 'prime_referral';
 
 export default function CenterHome() {
+  const [, setLocation] = useLocation();
   const [codeInput, setCodeInput] = useState("");
   const [showValidate, setShowValidate] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
-  const recentTests = mockCenterTests;
-  const wallet = mockCenterWallet;
-  const revenue = mockCenterRevenue;
-  const withdrawals = mockCenterWithdrawals;
+
+  // Check auth
+  useEffect(() => {
+    if (!getAuthToken()) {
+      setLocation('/auth/center');
+    }
+  }, [setLocation]);
+
+  // API queries
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+  const { data: center, isLoading: centerLoading } = useMyCenter();
+  const { data: resultsData, isLoading: resultsLoading } = useCenterResults(0, 10);
+  const logoutMutation = useLogout();
+
+  const recentTests = resultsData?.content || [];
+
+  // Mock wallet data (would come from API in production)
+  const wallet = {
+    balance: '425750.00',
+    totalEarnings: '1250000.00',
+    currency: 'NGN'
+  };
+
+  // Mock revenue data (would come from API in production)
+  const revenue: { id: string; type: RevenueType; description: string; amount: string; patientCode: string; date: Date }[] = [
+    { id: 'rev-1', type: 'test', description: 'Comprehensive STI Panel', amount: '14500.00', patientCode: 'PSN3X7Y2Q9W5', date: new Date(Date.now() - 2 * 86400000) },
+    { id: 'rev-2', type: 'home_service', description: 'Home Service - HIV & Hepatitis Screening', amount: '20800.00', patientCode: 'PSN8K2M9L4P7', date: new Date(Date.now() - 3 * 86400000) },
+  ];
+
+  // Mock withdrawals
+  const withdrawals: { id: string; amount: string; bankName: string; accountNumber: string; status: string; createdAt: Date; processedAt?: Date }[] = [];
 
   // Calculate revenue stats
   const testRevenue = revenue.filter(r => r.type === 'test').reduce((sum, r) => sum + parseFloat(r.amount), 0);
   const homeServiceRevenue = revenue.filter(r => r.type === 'home_service').reduce((sum, r) => sum + parseFloat(r.amount), 0);
   const referralRevenue = revenue.filter(r => r.type === 'prime_referral').reduce((sum, r) => sum + parseFloat(r.amount), 0);
 
-  const getRevenueBadge = (type: CenterRevenueItem['type']) => {
+  const getRevenueBadge = (type: RevenueType) => {
     switch (type) {
       case 'test':
         return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"><FileText className="h-3 w-3 mr-1" />Test</Badge>;
@@ -63,6 +91,15 @@ export default function CenterHome() {
     setShowValidate(true);
   };
 
+  const handleLogout = async () => {
+    await logoutMutation.mutateAsync();
+    setLocation('/');
+  };
+
+  const formatBalance = (balance: string) => {
+    return parseFloat(balance).toLocaleString('en-NG', { minimumFractionDigits: 2 });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
@@ -71,13 +108,22 @@ export default function CenterHome() {
             <div className="flex items-center gap-3">
               <PriveScreenLogo size={32} />
               <div>
-                <h1 className="text-xl font-bold">Lifebridge Medical Diagnostics</h1>
+                {centerLoading ? (
+                  <Skeleton className="h-6 w-48" />
+                ) : (
+                  <h1 className="text-xl font-bold">{center?.name || 'Diagnostic Center'}</h1>
+                )}
                 <Badge variant="secondary" className="text-xs" data-testid="badge-role">Diagnostic Center</Badge>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Badge variant="default" className="px-3 py-1" data-testid="badge-verified">Verified</Badge>
+              {center?.verified && (
+                <Badge variant="default" className="px-3 py-1" data-testid="badge-verified">Verified</Badge>
+              )}
               <ThemeToggle />
+              <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
+                <LogOut className="h-5 w-5" />
+              </Button>
               <Button variant="ghost" size="icon" data-testid="button-back" asChild>
                 <a href="/">
                   <ArrowLeft className="h-5 w-5" />
@@ -108,7 +154,7 @@ export default function CenterHome() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold mb-4">
-                ₦{parseFloat(wallet.balance).toLocaleString()}
+                ₦{formatBalance(wallet.balance)}
               </div>
               <div className="flex gap-2">
                 <Button onClick={() => setShowWithdraw(true)} className="flex-1">
@@ -117,7 +163,7 @@ export default function CenterHome() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground mt-3">
-                Total Earnings: ₦{parseFloat(wallet.totalEarnings).toLocaleString()}
+                Total Earnings: ₦{formatBalance(wallet.totalEarnings)}
               </p>
             </CardContent>
           </Card>
@@ -261,28 +307,36 @@ export default function CenterHome() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {revenue.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center p-4 border rounded-lg hover:bg-muted/50"
-                    >
-                      <div className="w-24 flex-shrink-0">
-                        {getRevenueBadge(item.type)}
+                {revenue.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <TrendingUp className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No revenue yet</p>
+                    <p className="text-sm">Your earnings will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {revenue.map((item) => (
+                      <div
+                        key={item.id}
+                        className="flex items-center p-4 border rounded-lg hover:bg-muted/50"
+                      >
+                        <div className="w-24 flex-shrink-0">
+                          {getRevenueBadge(item.type)}
+                        </div>
+                        <div className="flex-1 min-w-0 px-4">
+                          <p className="font-medium truncate">{item.description}</p>
+                          <p className="text-sm text-muted-foreground truncate">
+                            Code: {item.patientCode}
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-semibold text-green-600">+₦{parseFloat(item.amount).toLocaleString()}</p>
+                          <p className="text-xs text-muted-foreground">{item.date.toLocaleDateString()}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0 px-4">
-                        <p className="font-medium truncate">{item.description}</p>
-                        <p className="text-sm text-muted-foreground truncate">
-                          Code: {item.patientCode}
-                        </p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="font-semibold text-green-600">+₦{parseFloat(item.amount).toLocaleString()}</p>
-                        <p className="text-xs text-muted-foreground">{item.date.toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -296,38 +350,51 @@ export default function CenterHome() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {recentTests.map((test) => (
-                    <div
-                      key={test.id}
-                      className="p-4 border rounded-lg"
-                      data-testid={`card-test-${test.id}`}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <CheckCircle2 className="h-5 w-5 text-primary" />
-                            <h3 className="font-semibold" data-testid={`text-test-code-${test.id}`}>Code: {test.code}</h3>
+                {resultsLoading ? (
+                  <div className="space-y-4">
+                    <Skeleton className="h-32 w-full" />
+                    <Skeleton className="h-32 w-full" />
+                  </div>
+                ) : recentTests.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <CheckCircle2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No tests processed yet</p>
+                    <p className="text-sm">Completed tests will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentTests.map((test: any) => (
+                      <div
+                        key={test.id}
+                        className="p-4 border rounded-lg"
+                        data-testid={`card-test-${test.id}`}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <CheckCircle2 className="h-5 w-5 text-primary" />
+                              <h3 className="font-semibold">Code: {test.assessmentCode?.code || 'N/A'}</h3>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              Result #: {test.resultNumber}
+                            </p>
                           </div>
-                          <p className="text-sm text-muted-foreground" data-testid={`text-patient-${test.id}`}>
-                            Patient verified as: {test.patientName}
-                          </p>
+                          <Badge variant="default">Completed</Badge>
                         </div>
-                        <Badge variant="default" data-testid={`badge-status-${test.id}`}>Completed</Badge>
-                      </div>
-                      <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-muted-foreground mb-1">Test Type</p>
-                          <p className="font-medium" data-testid={`text-type-${test.id}`}>{test.testType}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground mb-1">Test Date</p>
-                          <p data-testid={`text-date-${test.id}`}>{test.testedAt.toLocaleDateString()}</p>
+                        <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-muted-foreground mb-1">Test Type</p>
+                            <p className="font-medium">{test.testStandard?.name || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-muted-foreground mb-1">Test Date</p>
+                            <p>{new Date(test.testedAt).toLocaleDateString()}</p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -367,7 +434,7 @@ export default function CenterHome() {
                             {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
                           </Badge>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {withdrawal.processedAt ? withdrawal.processedAt.toLocaleDateString() : withdrawal.createdAt.toLocaleDateString()}
+                            {withdrawal.processedAt ? new Date(withdrawal.processedAt).toLocaleDateString() : new Date(withdrawal.createdAt).toLocaleDateString()}
                           </p>
                         </div>
                       </div>

@@ -25,7 +25,32 @@ import {
   Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { nigerianBanks } from "@/lib/mock-data";
+
+// Nigerian Banks list for bank selection dropdown
+const nigerianBanks = [
+  "Access Bank",
+  "Citibank Nigeria",
+  "Ecobank Nigeria",
+  "Fidelity Bank",
+  "First Bank of Nigeria",
+  "First City Monument Bank",
+  "Globus Bank",
+  "Guaranty Trust Bank",
+  "Heritage Bank",
+  "Keystone Bank",
+  "Polaris Bank",
+  "Providus Bank",
+  "Stanbic IBTC Bank",
+  "Standard Chartered Bank",
+  "Sterling Bank",
+  "SunTrust Bank",
+  "Titan Trust Bank",
+  "Union Bank of Nigeria",
+  "United Bank for Africa",
+  "Unity Bank",
+  "Wema Bank",
+  "Zenith Bank",
+];
 
 interface WithdrawDialogProps {
   open: boolean;

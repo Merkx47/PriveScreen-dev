@@ -1,12 +1,14 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Redirect } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Users,
   Building2,
@@ -29,13 +31,15 @@ import {
   RefreshCw,
   Crown,
   ArrowDownToLine,
-  ArrowUpRight,
-  Banknote
+  UserPlus,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { PriveScreenLogo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { WithdrawDialog } from "@/components/withdraw-dialog";
 import { AdminSettingsDialog } from "@/components/admin-settings-dialog";
+import { InviteAdminDialog } from "@/components/invite-admin-dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,58 +48,39 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import {
-  mockAdminRevenueStats,
-  mockAdminRevenue,
-  mockAdminWithdrawals,
-  mockCenterWithdrawals,
-  type AdminRevenueItem
-} from "@/lib/mock-data";
+  getDashboardStats,
+  getUsers,
+  getUserById,
+  searchUsers,
+  getCenters,
+  getSponsors,
+  getAuditLogs,
+  suspendUser,
+  unsuspendUser,
+  verifyCenter,
+  suspendCenter,
+  verifySponsor,
+  type UserListItem,
+  type CenterListItem,
+  type SponsorListItem,
+  type AuditLog,
+} from "@/lib/api/admin";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
-// Mock data for admin dashboard
-const mockStats = {
-  totalPatients: 1247,
-  totalCenters: 32,
-  totalSponsors: 89,
-  totalTests: 3421,
-  revenue: 15234000,
-  activeSubscriptions: 156,
-  pendingVerifications: 5,
-  todayTests: 47,
-};
-
-const mockPatients = [
-  { id: "p1", name: "Adebayo Okonkwo", email: "adebayo@example.com", status: "active", tests: 3, joined: "2024-01-15" },
-  { id: "p2", name: "Chioma Nwosu", email: "chioma@example.com", status: "active", tests: 5, joined: "2024-02-20" },
-  { id: "p3", name: "Emeka Okafor", email: "emeka@example.com", status: "inactive", tests: 1, joined: "2024-03-10" },
-  { id: "p4", name: "Fatima Abubakar", email: "fatima@example.com", status: "active", tests: 2, joined: "2024-04-05" },
-  { id: "p5", name: "Oluwaseun Adeyemi", email: "seun@example.com", status: "suspended", tests: 0, joined: "2024-05-12" },
-];
-
-const mockCenters = [
-  { id: "c1", name: "Lifebridge Medical Diagnostics", city: "Lagos", status: "verified", tests: 450, rating: 4.75 },
-  { id: "c2", name: "St. Nicholas Hospital Lab", city: "Lagos", status: "verified", tests: 380, rating: 4.85 },
-  { id: "c3", name: "Clina-Lancet Laboratories", city: "Lagos", status: "pending", tests: 0, rating: 0 },
-  { id: "c4", name: "Cedarcrest Hospitals", city: "Lagos", status: "verified", tests: 290, rating: 4.70 },
-  { id: "c5", name: "New Horizon Labs", city: "Abuja", status: "suspended", tests: 45, rating: 3.20 },
-];
-
-const mockSponsors = [
-  { id: "s1", name: "TechCorp Nigeria", email: "hr@techcorp.ng", status: "active", codes: 45, spent: 675000 },
-  { id: "s2", name: "Health First NGO", email: "admin@healthfirst.org", status: "active", codes: 120, spent: 1800000 },
-  { id: "s3", name: "Individual Sponsor", email: "john@email.com", status: "active", codes: 3, spent: 45000 },
-  { id: "s4", name: "Corporate Care Ltd", email: "wellness@corpcare.com", status: "inactive", codes: 0, spent: 0 },
-];
-
-const mockAuditLogs = [
-  { id: "a1", action: "Patient Registration", entity: "Fatima Abubakar", entityType: "patient", timestamp: new Date(Date.now() - 1000 * 60 * 5), admin: null },
-  { id: "a2", action: "Center Verified", entity: "Lifebridge Medical", entityType: "center", timestamp: new Date(Date.now() - 1000 * 60 * 30), admin: "Admin User" },
-  { id: "a3", action: "Test Completed", entity: "PSN8K2M9L4P7", entityType: "test", timestamp: new Date(Date.now() - 1000 * 60 * 60), admin: null },
-  { id: "a4", action: "Sponsor Code Purchase", entity: "TechCorp Nigeria", entityType: "sponsor", timestamp: new Date(Date.now() - 1000 * 60 * 90), admin: null },
-  { id: "a5", action: "Patient Suspended", entity: "Oluwaseun Adeyemi", entityType: "patient", timestamp: new Date(Date.now() - 1000 * 60 * 120), admin: "Admin User" },
-  { id: "a6", action: "Center Application", entity: "Clina-Lancet Labs", entityType: "center", timestamp: new Date(Date.now() - 1000 * 60 * 180), admin: null },
-  { id: "a7", action: "Prime Subscription", entity: "Chioma Nwosu", entityType: "patient", timestamp: new Date(Date.now() - 1000 * 60 * 240), admin: null },
-  { id: "a8", action: "Results Uploaded", entity: "center-1", entityType: "center", timestamp: new Date(Date.now() - 1000 * 60 * 300), admin: null },
-];
+// Stats interface matching backend response
+interface DashboardStats {
+  totalUsers: number;
+  newUsersLastMonth: number;
+  activeSubscriptions: number;
+  openTickets: number;
+  totalPlatformBalance: string;
+}
 
 type Tab = "overview" | "revenue" | "patients" | "centers" | "sponsors" | "logs";
 
@@ -106,32 +91,208 @@ export default function AdminDashboard() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [showWithdraw, setShowWithdraw] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showInviteAdmin, setShowInviteAdmin] = useState(false);
+  const [showUserDetails, setShowUserDetails] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserListItem | null>(null);
+  const [loadingUserDetails, setLoadingUserDetails] = useState(false);
 
-  const revenueStats = mockAdminRevenueStats;
-  const adminRevenue = mockAdminRevenue;
-  const adminWithdrawals = mockAdminWithdrawals;
-  const centerPayouts = mockCenterWithdrawals;
+  // Auth check state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-  const getRevenueBadge = (type: AdminRevenueItem['type']) => {
-    switch (type) {
-      case 'prime_subscription':
-        return <Badge variant="secondary" className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100"><Crown className="h-3 w-3 mr-1" />Prime</Badge>;
-      case 'test_commission':
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"><FileText className="h-3 w-3 mr-1" />Test</Badge>;
-      case 'center_payout':
-        return <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100"><ArrowUpRight className="h-3 w-3 mr-1" />Payout</Badge>;
-      case 'withdrawal':
-        return <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-100"><Banknote className="h-3 w-3 mr-1" />Withdraw</Badge>;
-      default:
-        return <Badge variant="secondary">{type}</Badge>;
+  // Loading and error states
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Data states
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [users, setUsers] = useState<UserListItem[]>([]);
+  const [centers, setCenters] = useState<CenterListItem[]>([]);
+  const [sponsors, setSponsors] = useState<SponsorListItem[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
+  const [pendingCenters, setPendingCenters] = useState<CenterListItem[]>([]);
+
+  // Auth check - must be before any conditional returns but after all hooks
+  useEffect(() => {
+    const storedUser = localStorage.getItem("authUser");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        if (user.role === "admin") {
+          setIsAuthenticated(true);
+          return;
+        }
+      } catch {
+        // Invalid stored data
+      }
+    }
+    setIsAuthenticated(false);
+  }, []);
+
+  // Fetch dashboard data
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const [statsRes, usersRes, centersRes, sponsorsRes, logsRes, pendingCentersRes] = await Promise.all([
+        getDashboardStats(),
+        getUsers("patient", 0, 20),
+        getCenters(undefined, 0, 20),
+        getSponsors(undefined, 0, 20),
+        getAuditLogs(undefined, undefined, 0, 20),
+        getCenters("pending", 0, 10),
+      ]);
+
+      if (statsRes.success && statsRes.data) {
+        setStats(statsRes.data as unknown as DashboardStats);
+      }
+      if (usersRes.success && usersRes.data) {
+        setUsers(usersRes.data.content || []);
+      }
+      if (centersRes.success && centersRes.data) {
+        setCenters(centersRes.data.content || []);
+      }
+      if (sponsorsRes.success && sponsorsRes.data) {
+        setSponsors(sponsorsRes.data.content || []);
+      }
+      if (logsRes.success && logsRes.data) {
+        setAuditLogs(logsRes.data.content || []);
+      }
+      if (pendingCentersRes.success && pendingCentersRes.data) {
+        setPendingCenters(pendingCentersRes.data.content || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch dashboard data:", err);
+      setError("Unable to load dashboard data. Please check your connection and try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleStatusChange = (entityType: string, entityId: string, newStatus: string) => {
-    toast({
-      title: "Status Updated",
-      description: `${entityType} status changed to ${newStatus}`,
-    });
+  // Search users (patients only)
+  const handleSearch = async (query: string) => {
+    try {
+      if (!query.trim()) {
+        const res = await getUsers("patient", 0, 20);
+        if (res.success && res.data) {
+          setUsers(res.data.content || []);
+        }
+        return;
+      }
+      const res = await searchUsers(query, 0, 20);
+      if (res.success && res.data) {
+        // Filter to only show patients in search results
+        setUsers((res.data.content || []).filter(u => u.role === "patient"));
+      }
+    } catch (err) {
+      console.error("Search failed:", err);
+      // Keep existing users on search failure
+    }
+  };
+
+  // View user details
+  const handleViewUserDetails = async (user: UserListItem) => {
+    setSelectedUser(user);
+    setShowUserDetails(true);
+    setLoadingUserDetails(true);
+    try {
+      const res = await getUserById(user.id);
+      if (res.success && res.data) {
+        setSelectedUser(res.data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch user details:", err);
+    } finally {
+      setLoadingUserDetails(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isAuthenticated === true) {
+      fetchDashboardData();
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      handleSearch(searchQuery);
+    }, 300);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
+
+  // Redirect to login if not authenticated (after all hooks)
+  if (isAuthenticated === false) {
+    return <Redirect to="/admin/login" />;
+  }
+
+  // Show loading while checking auth
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  const handleUserStatusChange = async (userId: string, action: "suspend" | "unsuspend") => {
+    try {
+      if (action === "suspend") {
+        const res = await suspendUser(userId, "Suspended by admin");
+        if (res.success) {
+          toast({ title: "User Suspended", description: "User has been suspended successfully" });
+          fetchDashboardData();
+        } else {
+          toast({ title: "Error", description: res.message || "Failed to suspend user", variant: "destructive" });
+        }
+      } else {
+        const res = await unsuspendUser(userId);
+        if (res.success) {
+          toast({ title: "User Activated", description: "User has been activated successfully" });
+          fetchDashboardData();
+        } else {
+          toast({ title: "Error", description: res.message || "Failed to activate user", variant: "destructive" });
+        }
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred", variant: "destructive" });
+    }
+  };
+
+  const handleCenterAction = async (centerId: string, action: "verify" | "suspend") => {
+    try {
+      if (action === "verify") {
+        const res = await verifyCenter(centerId);
+        if (res.success) {
+          toast({ title: "Center Verified", description: "Center has been verified successfully" });
+          fetchDashboardData();
+        } else {
+          toast({ title: "Error", description: res.message || "Failed to verify center", variant: "destructive" });
+        }
+      } else {
+        const res = await suspendCenter(centerId, "Suspended by admin");
+        if (res.success) {
+          toast({ title: "Center Suspended", description: "Center has been suspended" });
+          fetchDashboardData();
+        } else {
+          toast({ title: "Error", description: res.message || "Failed to suspend center", variant: "destructive" });
+        }
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred", variant: "destructive" });
+    }
+  };
+
+  const handleSponsorVerify = async (sponsorId: string) => {
+    try {
+      const res = await verifySponsor(sponsorId);
+      if (res.success) {
+        toast({ title: "Sponsor Verified", description: "Sponsor has been verified successfully" });
+        fetchDashboardData();
+      } else {
+        toast({ title: "Error", description: res.message || "Failed to verify sponsor", variant: "destructive" });
+      }
+    } catch (err) {
+      toast({ title: "Error", description: "An unexpected error occurred", variant: "destructive" });
+    }
   };
 
   const formatTimeAgo = (date: Date) => {
@@ -193,6 +354,10 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowInviteAdmin(true)}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Invite Admin
+              </Button>
               <ThemeToggle />
               <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)}>
                 <Settings className="h-5 w-5" />
@@ -208,14 +373,32 @@ export default function AdminDashboard() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive" className="mb-6">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>{error}</span>
+              <Button variant="outline" size="sm" onClick={fetchDashboardData}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <Card>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Patients</p>
-                  <p className="text-2xl font-bold">{mockStats.totalPatients.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground">Total Users</p>
+                  {isLoading ? (
+                    <Skeleton className="h-8 w-20" />
+                  ) : (
+                    <p className="text-2xl font-bold">{(stats?.totalUsers || 0).toLocaleString()}</p>
+                  )}
                 </div>
                 <Users className="h-8 w-8 text-blue-500" />
               </div>
@@ -227,7 +410,11 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Diagnostic Centers</p>
-                  <p className="text-2xl font-bold">{mockStats.totalCenters}</p>
+                  {isLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <p className="text-2xl font-bold">{centers.length}</p>
+                  )}
                 </div>
                 <Building2 className="h-8 w-8 text-purple-500" />
               </div>
@@ -239,7 +426,11 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Sponsors</p>
-                  <p className="text-2xl font-bold">{mockStats.totalSponsors}</p>
+                  {isLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <p className="text-2xl font-bold">{sponsors.length}</p>
+                  )}
                 </div>
                 <Heart className="h-8 w-8 text-green-500" />
               </div>
@@ -250,8 +441,12 @@ export default function AdminDashboard() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <p className="text-2xl font-bold">₦{(mockStats.revenue / 1000000).toFixed(1)}M</p>
+                  <p className="text-sm text-muted-foreground">Platform Balance</p>
+                  {isLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <p className="text-2xl font-bold">₦{((parseFloat(stats?.totalPlatformBalance || "0")) / 1000000).toFixed(1)}M</p>
+                  )}
                 </div>
                 <Wallet className="h-8 w-8 text-amber-500" />
               </div>
@@ -266,8 +461,8 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-3">
                 <Activity className="h-5 w-5 text-primary" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Tests Today</p>
-                  <p className="font-bold">{mockStats.todayTests}</p>
+                  <p className="text-xs text-muted-foreground">New Users (30 days)</p>
+                  {isLoading ? <Skeleton className="h-5 w-8" /> : <p className="font-bold">{stats?.newUsersLastMonth || 0}</p>}
                 </div>
               </div>
             </CardContent>
@@ -279,7 +474,7 @@ export default function AdminDashboard() {
                 <Clock className="h-5 w-5 text-amber-600" />
                 <div>
                   <p className="text-xs text-muted-foreground">Pending Verifications</p>
-                  <p className="font-bold">{mockStats.pendingVerifications}</p>
+                  {isLoading ? <Skeleton className="h-5 w-8" /> : <p className="font-bold">{pendingCenters.length}</p>}
                 </div>
               </div>
             </CardContent>
@@ -291,7 +486,7 @@ export default function AdminDashboard() {
                 <TrendingUp className="h-5 w-5 text-green-600" />
                 <div>
                   <p className="text-xs text-muted-foreground">Active Subscriptions</p>
-                  <p className="font-bold">{mockStats.activeSubscriptions}</p>
+                  {isLoading ? <Skeleton className="h-5 w-8" /> : <p className="font-bold">{stats?.activeSubscriptions || 0}</p>}
                 </div>
               </div>
             </CardContent>
@@ -302,8 +497,8 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-3">
                 <FileText className="h-5 w-5 text-purple-600" />
                 <div>
-                  <p className="text-xs text-muted-foreground">Total Tests</p>
-                  <p className="font-bold">{mockStats.totalTests.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Open Tickets</p>
+                  {isLoading ? <Skeleton className="h-5 w-8" /> : <p className="font-bold">{stats?.openTickets || 0}</p>}
                 </div>
               </div>
             </CardContent>
@@ -331,20 +526,36 @@ export default function AdminDashboard() {
                   <CardDescription>Latest platform activities</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {mockAuditLogs.slice(0, 5).map((log) => (
-                      <div key={log.id} className="flex items-center gap-3 py-2">
-                        <div className="w-24 flex-shrink-0">
-                          {getEntityBadge(log.entityType)}
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={i} className="flex items-center gap-3 py-2">
+                          <Skeleton className="h-6 w-24" />
+                          <div className="flex-1">
+                            <Skeleton className="h-4 w-full mb-1" />
+                            <Skeleton className="h-3 w-2/3" />
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{log.action}</p>
-                          <p className="text-xs text-muted-foreground truncate">{log.entity}</p>
+                      ))}
+                    </div>
+                  ) : auditLogs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-8">No recent activity</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {auditLogs.slice(0, 5).map((log) => (
+                        <div key={log.id} className="flex items-center gap-3 py-2">
+                          <div className="w-24 flex-shrink-0">
+                            {getEntityBadge(log.resourceType)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{log.action}</p>
+                            <p className="text-xs text-muted-foreground truncate">{log.resourceId || "System"}</p>
+                          </div>
+                          <span className="text-xs text-muted-foreground flex-shrink-0 w-16 text-right">{formatTimeAgo(new Date(log.createdAt))}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground flex-shrink-0 w-16 text-right">{formatTimeAgo(log.timestamp)}</span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -355,46 +566,92 @@ export default function AdminDashboard() {
                   <CardDescription>Centers awaiting approval</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {mockCenters.filter(c => c.status === "pending").map((center) => (
-                    <div key={center.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium">{center.name}</p>
-                        <p className="text-sm text-muted-foreground">{center.city}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="outline" className="text-green-600">
-                          <CheckCircle2 className="h-4 w-4" />
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-red-600">
-                          <XCircle className="h-4 w-4" />
-                        </Button>
-                      </div>
+                  {isLoading ? (
+                    <div className="space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <div key={i} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <Skeleton className="h-4 w-32 mb-1" />
+                            <Skeleton className="h-3 w-20" />
+                          </div>
+                          <div className="flex gap-2">
+                            <Skeleton className="h-8 w-8" />
+                            <Skeleton className="h-8 w-8" />
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                  {mockCenters.filter(c => c.status === "pending").length === 0 && (
+                  ) : pendingCenters.length === 0 ? (
                     <p className="text-sm text-muted-foreground text-center py-4">No pending verifications</p>
+                  ) : (
+                    pendingCenters.map((center) => (
+                      <div key={center.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{center.name}</p>
+                          <p className="text-sm text-muted-foreground">{center.city}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-green-600"
+                            onClick={() => handleCenterAction(center.id, "verify")}
+                          >
+                            <CheckCircle2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-red-600"
+                            onClick={() => handleCenterAction(center.id, "suspend")}
+                          >
+                            <XCircle className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))
                   )}
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
 
-          {/* Revenue Tab */}
+          {/* Revenue Tab - Coming Soon */}
           <TabsContent value="revenue" className="space-y-4">
-            {/* Revenue Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card className="border-dashed">
+              <CardContent className="py-16">
+                <div className="text-center">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Wallet className="h-8 w-8 text-primary" />
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">Revenue Management Coming Soon</h3>
+                  <p className="text-muted-foreground max-w-md mx-auto mb-4">
+                    Track platform revenue, manage payouts, and view financial reports. This feature is currently under development.
+                  </p>
+                  <div className="flex justify-center gap-4">
+                    <Badge variant="secondary">
+                      <Clock className="h-3 w-3 mr-1" />
+                      In Development
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Platform Balance Preview */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 opacity-60">
               <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
                 <CardContent className="pt-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Platform Balance</p>
-                      <p className="text-2xl font-bold">₦{(parseFloat(revenueStats.platformBalance) / 1000000).toFixed(2)}M</p>
+                      <p className="text-2xl font-bold">₦{((parseFloat(stats?.totalPlatformBalance || "0")) / 1000000).toFixed(2)}M</p>
                     </div>
                     <Wallet className="h-8 w-8 text-primary" />
                   </div>
-                  <Button onClick={() => setShowWithdraw(true)} size="sm" className="w-full mt-4">
+                  <Button disabled size="sm" className="w-full mt-4">
                     <ArrowDownToLine className="h-4 w-4 mr-2" />
-                    Withdraw
+                    Withdraw (Coming Soon)
                   </Button>
                 </CardContent>
               </Card>
@@ -404,7 +661,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Prime Subscriptions</p>
-                      <p className="text-2xl font-bold">₦{(parseFloat(revenueStats.primeSubscriptions) / 1000000).toFixed(2)}M</p>
+                      <p className="text-2xl font-bold">₦0.00M</p>
                     </div>
                     <Crown className="h-8 w-8 text-amber-500" />
                   </div>
@@ -416,151 +673,13 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Test Commissions</p>
-                      <p className="text-2xl font-bold">₦{(parseFloat(revenueStats.testCommissions) / 1000000).toFixed(2)}M</p>
+                      <p className="text-2xl font-bold">₦0.00M</p>
                     </div>
                     <FileText className="h-8 w-8 text-blue-500" />
                   </div>
                 </CardContent>
               </Card>
             </div>
-
-            {/* Secondary Stats */}
-            <div className="grid grid-cols-2 gap-4">
-              <Card>
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center gap-3">
-                    <Clock className="h-5 w-5 text-amber-500" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Pending Payouts</p>
-                      <p className="font-bold">₦{parseFloat(revenueStats.pendingPayouts).toLocaleString()}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardContent className="pt-4 pb-4">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                    <div>
-                      <p className="text-xs text-muted-foreground">Completed Payouts</p>
-                      <p className="font-bold">₦{(parseFloat(revenueStats.completedPayouts) / 1000000).toFixed(1)}M</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Revenue Transactions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Revenue Transactions</CardTitle>
-                  <CardDescription>Recent income and payouts</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {adminRevenue.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center p-3 border rounded-lg hover:bg-muted/50"
-                      >
-                        <div className="w-20 flex-shrink-0">
-                          {getRevenueBadge(item.type)}
-                        </div>
-                        <div className="flex-1 min-w-0 px-3">
-                          <p className="text-sm font-medium truncate">{item.description}</p>
-                          <p className="text-xs text-muted-foreground truncate">{item.reference}</p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className={`font-semibold ${parseFloat(item.amount) < 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {parseFloat(item.amount) < 0 ? '-' : '+'}₦{Math.abs(parseFloat(item.amount)).toLocaleString()}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{item.date.toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Center Payout Requests */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Center Payout Requests</CardTitle>
-                  <CardDescription>Withdrawals from diagnostic centers</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {centerPayouts.map((payout) => (
-                      <div
-                        key={payout.id}
-                        className="flex items-center justify-between p-3 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">₦{parseFloat(payout.amount).toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {payout.bankName} - ****{payout.accountNumber.slice(-4)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">{payout.accountName}</p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant={payout.status === 'completed' ? 'default' : payout.status === 'processing' ? 'secondary' : 'outline'}>
-                            {payout.status === 'completed' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                            {payout.status === 'processing' && <Clock className="h-3 w-3 mr-1" />}
-                            {payout.status.charAt(0).toUpperCase() + payout.status.slice(1)}
-                          </Badge>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {payout.processedAt ? payout.processedAt.toLocaleDateString() : payout.createdAt.toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Admin Withdrawals History */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Platform Withdrawals</CardTitle>
-                <CardDescription>Your withdrawals to bank account</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {adminWithdrawals.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Banknote className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                    <p>No withdrawals yet</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {adminWithdrawals.map((withdrawal) => (
-                      <div
-                        key={withdrawal.id}
-                        className="flex items-center p-4 border rounded-lg"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium">₦{parseFloat(withdrawal.amount).toLocaleString()}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {withdrawal.bankName} - ****{withdrawal.accountNumber.slice(-4)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <Badge variant={withdrawal.status === 'completed' ? 'default' : 'secondary'}>
-                            {withdrawal.status === 'completed' && <CheckCircle2 className="h-3 w-3 mr-1" />}
-                            {withdrawal.status.charAt(0).toUpperCase() + withdrawal.status.slice(1)}
-                          </Badge>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {withdrawal.processedAt?.toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* Patients Tab */}
@@ -589,7 +708,6 @@ export default function AdminDashboard() {
                       <SelectContent>
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="inactive">Inactive</SelectItem>
                         <SelectItem value="suspended">Suspended</SelectItem>
                       </SelectContent>
                     </Select>
@@ -597,52 +715,81 @@ export default function AdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {mockPatients
-                    .filter(p => statusFilter === "all" || p.status === statusFilter)
-                    .filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.email.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map((patient) => (
-                    <div key={patient.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                          <Users className="h-5 w-5 text-primary" />
+                {isLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="w-10 h-10 rounded-full" />
+                          <div>
+                            <Skeleton className="h-4 w-32 mb-1" />
+                            <Skeleton className="h-3 w-48" />
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{patient.name}</p>
-                          <p className="text-sm text-muted-foreground">{patient.email}</p>
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="h-4 w-16" />
+                          <Skeleton className="h-6 w-16" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm">{patient.tests} tests</p>
-                          <p className="text-xs text-muted-foreground">Joined {patient.joined}</p>
+                    ))}
+                  </div>
+                ) : users.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Users className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No patients found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {users
+                      .filter(u => statusFilter === "all" || (statusFilter === "suspended" ? u.suspended : !u.suspended))
+                      .map((user) => (
+                      <div key={user.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                            <Users className="h-5 w-5 text-primary" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{user.firstName} {user.lastName}</p>
+                            <p className="text-sm text-muted-foreground">{user.email}</p>
+                          </div>
                         </div>
-                        {getStatusBadge(patient.status)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusChange("Patient", patient.id, "active")}>
-                              <UserCheck className="h-4 w-4 mr-2" />
-                              Activate
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusChange("Patient", patient.id, "suspended")} className="text-destructive">
-                              <UserX className="h-4 w-4 mr-2" />
-                              Suspend
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <Badge variant="outline" className="text-xs">{user.role}</Badge>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Joined {new Date(user.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {getStatusBadge(user.suspended ? "suspended" : "active")}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewUserDetails(user)}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              {user.suspended ? (
+                                <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, "unsuspend")}>
+                                  <UserCheck className="h-4 w-4 mr-2" />
+                                  Activate
+                                </DropdownMenuItem>
+                              ) : (
+                                <DropdownMenuItem onClick={() => handleUserStatusChange(user.id, "suspend")} className="text-destructive">
+                                  <UserX className="h-4 w-4 mr-2" />
+                                  Suspend
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -672,7 +819,7 @@ export default function AdminDashboard() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="verified">Verified</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="suspended">Suspended</SelectItem>
                       </SelectContent>
@@ -681,52 +828,95 @@ export default function AdminDashboard() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {mockCenters
-                    .filter(c => statusFilter === "all" || c.status === statusFilter)
-                    .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map((center) => (
-                    <div key={center.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                          <Building2 className="h-5 w-5 text-purple-600" />
+                {isLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="w-10 h-10 rounded-full" />
+                          <div>
+                            <Skeleton className="h-4 w-40 mb-1" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{center.name}</p>
-                          <p className="text-sm text-muted-foreground">{center.city}</p>
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="h-4 w-20" />
+                          <Skeleton className="h-6 w-16" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm">{center.tests} tests</p>
-                          <p className="text-xs text-muted-foreground">Rating: {center.rating || "N/A"}</p>
+                    ))}
+                  </div>
+                ) : centers.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Building2 className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No diagnostic centers found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {centers
+                      .filter(c => statusFilter === "all" || c.status === statusFilter)
+                      .filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map((center) => (
+                      <div key={center.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                            <Building2 className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{center.name}</p>
+                            <p className="text-sm text-muted-foreground">{center.city}, {center.state}</p>
+                          </div>
                         </div>
-                        {getStatusBadge(center.status)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusChange("Center", center.id, "verified")}>
-                              <CheckCircle2 className="h-4 w-4 mr-2" />
-                              Verify
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusChange("Center", center.id, "suspended")} className="text-destructive">
-                              <XCircle className="h-4 w-4 mr-2" />
-                              Suspend
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-sm">
+                              {center.verified ? (
+                                <Badge variant="outline" className="text-green-600 border-green-200">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-amber-600 border-amber-200">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  Unverified
+                                </Badge>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Rating: {center.rating?.toFixed(1) || "N/A"} ({center.ratingCount || 0} reviews)
+                            </p>
+                          </div>
+                          {getStatusBadge(center.status)}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              {!center.verified && (
+                                <DropdownMenuItem onClick={() => handleCenterAction(center.id, "verify")}>
+                                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                                  Verify
+                                </DropdownMenuItem>
+                              )}
+                              {center.status !== "suspended" ? (
+                                <DropdownMenuItem onClick={() => handleCenterAction(center.id, "suspend")} className="text-destructive">
+                                  <XCircle className="h-4 w-4 mr-2" />
+                                  Suspend
+                                </DropdownMenuItem>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -740,63 +930,106 @@ export default function AdminDashboard() {
                     <CardTitle>Sponsor Management</CardTitle>
                     <CardDescription>Manage corporate and individual sponsors</CardDescription>
                   </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search sponsors..."
-                      className="pl-9 w-64"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                    />
+                  <div className="flex gap-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search sponsors..."
+                        className="pl-9 w-64"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                      />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger className="w-32">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="pending">Pending</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {mockSponsors
-                    .filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map((sponsor) => (
-                    <div key={sponsor.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                          <Heart className="h-5 w-5 text-green-600" />
+                {isLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="w-10 h-10 rounded-full" />
+                          <div>
+                            <Skeleton className="h-4 w-40 mb-1" />
+                            <Skeleton className="h-3 w-48" />
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium">{sponsor.name}</p>
-                          <p className="text-sm text-muted-foreground">{sponsor.email}</p>
+                        <div className="flex items-center gap-4">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-6 w-16" />
                         </div>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm">{sponsor.codes} codes purchased</p>
-                          <p className="text-xs text-muted-foreground">₦{sponsor.spent.toLocaleString()} spent</p>
+                    ))}
+                  </div>
+                ) : sponsors.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Heart className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No sponsors found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {sponsors
+                      .filter(s => statusFilter === "all" || s.status === statusFilter)
+                      .filter(s => (s.companyName || s.contactName || "").toLowerCase().includes(searchQuery.toLowerCase()))
+                      .map((sponsor) => (
+                      <div key={sponsor.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                            <Heart className="h-5 w-5 text-green-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{sponsor.companyName || sponsor.contactName || "Unnamed Sponsor"}</p>
+                            <p className="text-sm text-muted-foreground">{sponsor.contactEmail}</p>
+                            {sponsor.companyType && (
+                              <Badge variant="outline" className="text-xs mt-1">{sponsor.companyType}</Badge>
+                            )}
+                          </div>
                         </div>
-                        {getStatusBadge(sponsor.status)}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusChange("Sponsor", sponsor.id, "active")}>
-                              <UserCheck className="h-4 w-4 mr-2" />
-                              Activate
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleStatusChange("Sponsor", sponsor.id, "inactive")} className="text-destructive">
-                              <UserX className="h-4 w-4 mr-2" />
-                              Deactivate
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-sm text-muted-foreground">
+                              {sponsor.city && sponsor.state ? `${sponsor.city}, ${sponsor.state}` : "Location not set"}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              Joined {new Date(sponsor.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          {getStatusBadge(sponsor.status)}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Eye className="h-4 w-4 mr-2" />
+                                View Details
+                              </DropdownMenuItem>
+                              {sponsor.status === "pending" && (
+                                <DropdownMenuItem onClick={() => handleSponsorVerify(sponsor.id)}>
+                                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                                  Verify
+                                </DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -810,32 +1043,56 @@ export default function AdminDashboard() {
                     <CardTitle>Audit Logs</CardTitle>
                     <CardDescription>System activity and admin actions</CardDescription>
                   </div>
-                  <Button variant="outline" size="sm">
-                    <RefreshCw className="h-4 w-4 mr-2" />
+                  <Button variant="outline" size="sm" onClick={fetchDashboardData} disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
                     Refresh
                   </Button>
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {mockAuditLogs.map((log) => (
-                    <div key={log.id} className="flex items-center p-4 border rounded-lg hover:bg-muted/50">
-                      <div className="w-28 flex-shrink-0">
-                        {getEntityBadge(log.entityType)}
+                {isLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="flex items-center p-4 border rounded-lg">
+                        <Skeleton className="w-28 h-6" />
+                        <div className="flex-1 px-4">
+                          <Skeleton className="h-4 w-full mb-1" />
+                          <Skeleton className="h-3 w-2/3" />
+                        </div>
+                        <Skeleton className="w-24 h-8" />
                       </div>
-                      <div className="flex-1 min-w-0 px-4">
-                        <p className="font-medium truncate">{log.action}</p>
-                        <p className="text-sm text-muted-foreground truncate">{log.entity}</p>
+                    ))}
+                  </div>
+                ) : auditLogs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p>No audit logs found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {auditLogs.map((log) => (
+                      <div key={log.id} className="flex items-center p-4 border rounded-lg hover:bg-muted/50">
+                        <div className="w-28 flex-shrink-0">
+                          {getEntityBadge(log.resourceType)}
+                        </div>
+                        <div className="flex-1 min-w-0 px-4">
+                          <p className="font-medium truncate">{log.action}</p>
+                          <p className="text-sm text-muted-foreground truncate">{log.resourceId || "System Action"}</p>
+                        </div>
+                        <div className="w-32 flex-shrink-0 text-right">
+                          <p className="text-sm">{formatTimeAgo(new Date(log.createdAt))}</p>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {log.user ? `${log.user.firstName} ${log.user.lastName}` : "System"}
+                          </p>
+                        </div>
                       </div>
-                      <div className="w-24 flex-shrink-0 text-right">
-                        <p className="text-sm">{formatTimeAgo(log.timestamp)}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {log.admin ? `by ${log.admin}` : "System"}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -845,7 +1102,7 @@ export default function AdminDashboard() {
       <WithdrawDialog
         open={showWithdraw}
         onOpenChange={setShowWithdraw}
-        availableBalance={revenueStats.platformBalance}
+        availableBalance={stats?.totalPlatformBalance || "0"}
         accountType="admin"
       />
 
@@ -853,6 +1110,108 @@ export default function AdminDashboard() {
         open={showSettings}
         onOpenChange={setShowSettings}
       />
+
+      <InviteAdminDialog
+        open={showInviteAdmin}
+        onOpenChange={setShowInviteAdmin}
+      />
+
+      {/* User Details Dialog */}
+      <Dialog open={showUserDetails} onOpenChange={setShowUserDetails}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>User Details</DialogTitle>
+            <DialogDescription>
+              {selectedUser ? `${selectedUser.firstName} ${selectedUser.lastName}` : "Loading..."}
+            </DialogDescription>
+          </DialogHeader>
+          {loadingUserDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : selectedUser ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Users className="h-8 w-8 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">{selectedUser.firstName} {selectedUser.lastName}</h3>
+                  <p className="text-sm text-muted-foreground">{selectedUser.email}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase">Role</p>
+                  <Badge variant="outline">{selectedUser.role}</Badge>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase">Status</p>
+                  {getStatusBadge(selectedUser.suspended ? "suspended" : "active")}
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase">Email Verified</p>
+                  <Badge variant={selectedUser.emailVerified ? "default" : "secondary"}>
+                    {selectedUser.emailVerified ? "Verified" : "Not Verified"}
+                  </Badge>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase">Joined</p>
+                  <p className="text-sm font-medium">
+                    {new Date(selectedUser.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+
+              {selectedUser.lastLoginAt && (
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground uppercase">Last Login</p>
+                  <p className="text-sm font-medium">
+                    {new Date(selectedUser.lastLoginAt).toLocaleString()}
+                  </p>
+                </div>
+              )}
+
+              {selectedUser.suspended && selectedUser.suspendedReason && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <span className="font-medium">Suspension Reason:</span> {selectedUser.suspendedReason}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex gap-2 pt-4">
+                {selectedUser.suspended ? (
+                  <Button
+                    className="flex-1"
+                    onClick={() => {
+                      handleUserStatusChange(selectedUser.id, "unsuspend");
+                      setShowUserDetails(false);
+                    }}
+                  >
+                    <UserCheck className="h-4 w-4 mr-2" />
+                    Activate User
+                  </Button>
+                ) : (
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={() => {
+                      handleUserStatusChange(selectedUser.id, "suspend");
+                      setShowUserDetails(false);
+                    }}
+                  >
+                    <UserX className="h-4 w-4 mr-2" />
+                    Suspend User
+                  </Button>
+                )}
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

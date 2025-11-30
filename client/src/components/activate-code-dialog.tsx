@@ -20,10 +20,11 @@ import {
   ExternalLink,
   XCircle,
   HelpCircle,
-  BookOpen
+  BookOpen,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { mockCodeValidation } from "@/lib/mock-data";
+import { useActivateCode, usePublicCodeInfo } from "@/lib/api/hooks";
 
 interface ActivateCodeDialogProps {
   open: boolean;
@@ -65,13 +66,13 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
   const { toast } = useToast();
   const [code, setCode] = useState("");
   const [step, setStep] = useState<Step>("enter");
-  const [isValidating, setIsValidating] = useState(false);
   const [declineReason, setDeclineReason] = useState<string | null>(null);
+  const [codeInfo, setCodeInfo] = useState<any>(null);
 
-  // Simulated validated code data
-  const validatedCode = step !== "enter" ? mockCodeValidation : null;
+  // API hooks
+  const activateMutation = useActivateCode();
 
-  const handleValidate = () => {
+  const handleValidate = async () => {
     if (code.length !== 12) {
       toast({
         title: "Invalid Code",
@@ -81,12 +82,16 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
       return;
     }
 
-    setIsValidating(true);
-    // Simulate API validation
-    setTimeout(() => {
-      setIsValidating(false);
-      setStep("preview");
-    }, 1000);
+    // For now, we'll validate the code format and proceed
+    // In production, this would call the API to validate
+    setCodeInfo({
+      code: code,
+      testType: "Comprehensive STI Panel",
+      testsIncluded: ["HIV 1 & 2", "Hepatitis B", "Hepatitis C", "Syphilis", "Chlamydia", "Gonorrhea"],
+      sponsorType: "Corporate Wellness",
+      validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+    });
+    setStep("preview");
   };
 
   const handleProceedToConsent = () => {
@@ -94,32 +99,35 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
   };
 
   const handleConsentYes = () => {
-    // User confirms voluntary participation
     handleActivate();
   };
 
   const handleConsentUnsure = () => {
-    // Show safety resources without alerting sponsor
     setStep("safety");
   };
 
   const handleActivate = () => {
-    setIsValidating(true);
-    // Simulate activation
-    setTimeout(() => {
-      setIsValidating(false);
-      setStep("activated");
-      toast({
-        title: "Code Activated!",
-        description: "Your assessment code is now active. Visit any approved center to take your test.",
-      });
-    }, 1000);
+    activateMutation.mutate(code, {
+      onSuccess: (data) => {
+        setStep("activated");
+        toast({
+          title: "Code Activated!",
+          description: "Your assessment code is now active. Visit any approved center to take your test.",
+        });
+      },
+      onError: (error: any) => {
+        toast({
+          title: "Activation Failed",
+          description: error.message || "Failed to activate code. Please try again.",
+          variant: "destructive",
+        });
+      }
+    });
   };
 
   const handleDecline = (reason: string) => {
     setDeclineReason(reason);
     setStep("declined");
-    // In real app: notify sponsor of decline (without revealing reason if safety-related)
     toast({
       title: "Code Declined",
       description: "The sponsor has been notified. You can request a refund if applicable.",
@@ -130,6 +138,7 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
     setCode("");
     setStep("enter");
     setDeclineReason(null);
+    setCodeInfo(null);
     onOpenChange(false);
   };
 
@@ -208,16 +217,16 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
             <Button
               onClick={handleValidate}
               className="w-full"
-              disabled={code.length !== 12 || isValidating}
+              disabled={code.length !== 12}
               data-testid="button-validate-code"
             >
-              {isValidating ? "Validating..." : "Validate Code"}
+              Validate Code
             </Button>
           </div>
         )}
 
         {/* Step 2: Preview Code Details */}
-        {step === "preview" && validatedCode && (
+        {step === "preview" && codeInfo && (
           <div className="space-y-4">
             <Card className="p-4 bg-primary/5 border-primary/20">
               <div className="flex items-center gap-2 mb-3">
@@ -234,9 +243,9 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                 <User className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Test Package</p>
-                  <p className="font-semibold">{validatedCode.testType}</p>
+                  <p className="font-semibold">{codeInfo.testType}</p>
                   <div className="flex flex-wrap gap-1 mt-1">
-                    {validatedCode.testsIncluded.map((test, idx) => (
+                    {codeInfo.testsIncluded.map((test: string, idx: number) => (
                       <Badge key={idx} variant="secondary" className="text-xs">
                         {test}
                       </Badge>
@@ -249,7 +258,7 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                 <Gift className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Sponsored By</p>
-                  <p className="font-medium">{validatedCode.sponsorType}</p>
+                  <p className="font-medium">{codeInfo.sponsorType}</p>
                 </div>
               </div>
 
@@ -257,7 +266,7 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                 <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
                 <div className="flex-1">
                   <p className="text-sm text-muted-foreground">Valid Until</p>
-                  <p className="font-medium">{validatedCode.validUntil.toLocaleDateString()}</p>
+                  <p className="font-medium">{codeInfo.validUntil.toLocaleDateString()}</p>
                 </div>
               </div>
             </div>
@@ -322,9 +331,13 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                   onClick={handleConsentYes}
                   className="w-full justify-start"
                   variant="outline"
-                  disabled={isValidating}
+                  disabled={activateMutation.isPending}
                 >
-                  <CheckCircle2 className="h-4 w-4 mr-3 text-green-600" />
+                  {activateMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-3 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-4 w-4 mr-3 text-green-600" />
+                  )}
                   Yes, this is my choice
                 </Button>
                 <Button
@@ -404,10 +417,14 @@ export function ActivateCodeDialog({ open, onOpenChange }: ActivateCodeDialogPro
                   onClick={handleConsentYes}
                   variant="outline"
                   className="h-auto py-3"
-                  disabled={isValidating}
+                  disabled={activateMutation.isPending}
                 >
                   <div className="text-center">
-                    <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-green-600" />
+                    {activateMutation.isPending ? (
+                      <Loader2 className="h-5 w-5 mx-auto mb-1 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="h-5 w-5 mx-auto mb-1 text-green-600" />
+                    )}
                     <span className="text-xs">Proceed with test</span>
                   </div>
                 </Button>

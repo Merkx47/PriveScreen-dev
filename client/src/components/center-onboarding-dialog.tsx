@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Building2,
   FileCheck,
@@ -25,10 +26,11 @@ import {
   DollarSign,
   TestTube,
   Home,
-  Car
+  Car,
+  Loader2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { mockTestStandards } from "@/lib/mock-data";
+import { getAllTests, type TestStandard } from "@/lib/api/tests";
 import { Separator } from "@/components/ui/separator";
 
 interface CenterOnboardingDialogProps {
@@ -85,8 +87,8 @@ const nigerianStates = [
 ];
 
 // Initialize test pricing with default suggested prices
-const initializeTestPricing = (): TestPricing[] => {
-  return mockTestStandards.map(test => ({
+const initializeTestPricing = (tests: TestStandard[]): TestPricing[] => {
+  return tests.map(test => ({
     testStandardId: test.id,
     price: test.price, // Use standard price as default suggestion
     homeServicePrice: String(Math.round(parseFloat(test.price) * 1.3)), // 30% markup for home service
@@ -97,6 +99,8 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
   const { toast } = useToast();
   const [step, setStep] = useState<Step>("info");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [testStandards, setTestStandards] = useState<TestStandard[]>([]);
+  const [isLoadingTests, setIsLoadingTests] = useState(false);
 
   const [formData, setFormData] = useState<CenterFormData>({
     centerName: "",
@@ -112,7 +116,7 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
     cacCertificate: null,
     medicalLicense: null,
     facilityPhotos: [],
-    testPricing: initializeTestPricing(),
+    testPricing: [],
     offersHomeService: false,
     homeServiceRadius: "10",
     hasQualifiedStaff: false,
@@ -122,6 +126,36 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
     agreeToAudits: false,
     agreeToTerms: false,
   });
+
+  // Fetch test standards when dialog opens
+  useEffect(() => {
+    if (open && testStandards.length === 0) {
+      const fetchTests = async () => {
+        setIsLoadingTests(true);
+        try {
+          const response = await getAllTests();
+          if (response.success && response.data) {
+            const activeTests = response.data.filter(t => t.active);
+            setTestStandards(activeTests);
+            // Initialize pricing if not already set
+            setFormData(prev => ({
+              ...prev,
+              testPricing: prev.testPricing.length === 0 ? initializeTestPricing(activeTests) : prev.testPricing
+            }));
+          }
+        } catch (err) {
+          toast({
+            title: "Error",
+            description: "Failed to load test standards",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingTests(false);
+        }
+      };
+      fetchTests();
+    }
+  }, [open, testStandards.length, toast]);
 
   const updateField = <K extends keyof CenterFormData>(field: K, value: CenterFormData[K]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -283,7 +317,7 @@ export function CenterOnboardingDialog({ open, onOpenChange }: CenterOnboardingD
     return steps.indexOf(step) + 1;
   };
 
-  const getTestById = (id: string) => mockTestStandards.find(t => t.id === id);
+  const getTestById = (id: string) => testStandards.find(t => t.id === id);
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>

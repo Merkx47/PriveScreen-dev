@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   ArrowLeft,
   Crown,
@@ -17,12 +18,14 @@ import {
   Percent,
   Phone,
   Heart,
-  Sparkles
+  Sparkles,
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { PriveScreenLogo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { mockWallet } from "@/lib/mock-data";
+import { getWallet, type Wallet } from "@/lib/api/wallet";
 
 type PlanType = "monthly" | "annual";
 
@@ -67,7 +70,26 @@ export default function GetPrime() {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("annual");
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
-  const wallet = mockWallet;
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchWallet = async () => {
+      try {
+        const res = await getWallet();
+        if (res.success && res.data) {
+          setWallet(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch wallet:", err);
+        setError("Unable to load wallet information");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchWallet();
+  }, []);
 
   const getPrice = () => {
     return selectedPlan === "monthly" ? PRIME_MONTHLY_PRICE : PRIME_ANNUAL_PRICE;
@@ -80,9 +102,22 @@ export default function GetPrime() {
     return 0;
   };
 
+  const getWalletBalance = () => {
+    return wallet ? parseFloat(wallet.balance) : 0;
+  };
+
   const handleSubscribe = async () => {
     const price = getPrice();
-    const balance = parseFloat(wallet.balance);
+    const balance = getWalletBalance();
+
+    if (!wallet) {
+      toast({
+        title: "Wallet Not Available",
+        description: "Please wait for your wallet to load or try again later",
+        variant: "destructive",
+      });
+      return;
+    }
 
     if (balance < price) {
       toast({
@@ -94,14 +129,14 @@ export default function GetPrime() {
     }
 
     setIsProcessing(true);
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // TODO: Integrate with backend Prime subscription API when available
+    // For now, show coming soon message
+    await new Promise(resolve => setTimeout(resolve, 1000));
     setIsProcessing(false);
-    setIsSubscribed(true);
 
     toast({
-      title: "Welcome to Prime!",
-      description: "You now have access to all Prime benefits",
+      title: "Coming Soon",
+      description: "Prime subscription will be available soon. Stay tuned!",
     });
   };
 
@@ -351,10 +386,21 @@ export default function GetPrime() {
                 <span className="font-bold text-2xl">₦{getPrice().toLocaleString()}</span>
               </div>
               <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                <p>Wallet Balance: ₦{parseFloat(wallet.balance).toLocaleString()}</p>
-                {parseFloat(wallet.balance) < getPrice() && (
-                  <p className="text-destructive mt-1">
-                    Insufficient balance. Please fund your wallet.
+                {isLoading ? (
+                  <Skeleton className="h-4 w-40" />
+                ) : wallet ? (
+                  <>
+                    <p>Wallet Balance: ₦{getWalletBalance().toLocaleString()}</p>
+                    {getWalletBalance() < getPrice() && (
+                      <p className="text-destructive mt-1">
+                        Insufficient balance. Please fund your wallet.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-amber-600">
+                    <AlertCircle className="h-4 w-4 inline mr-1" />
+                    Unable to load wallet balance
                   </p>
                 )}
               </div>
@@ -367,10 +413,13 @@ export default function GetPrime() {
           <Button
             className="w-full h-14 text-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700"
             onClick={handleSubscribe}
-            disabled={isProcessing || parseFloat(wallet.balance) < getPrice()}
+            disabled={isProcessing || isLoading || !wallet || getWalletBalance() < getPrice()}
           >
             {isProcessing ? (
-              <>Processing...</>
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Processing...
+              </>
             ) : (
               <>
                 <Crown className="h-5 w-5 mr-2" />

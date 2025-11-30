@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Upload, FileText, CheckCircle2, Plus, Trash2, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { mockCodeValidation, mockTestStandards } from "@/lib/mock-data";
+import { validateCode, type CodeValidation } from "@/lib/api/codes";
 
 interface UploadResultsDialogProps {
   open: boolean;
@@ -29,28 +29,24 @@ export function UploadResultsDialog({ open, onOpenChange }: UploadResultsDialogP
   const [assessmentCode, setAssessmentCode] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [codeValid, setCodeValid] = useState(false);
+  const [validatedData, setValidatedData] = useState<CodeValidation | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [testParameters, setTestParameters] = useState<TestParameter[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get test type from validated code
-  const validatedData = codeValid ? mockCodeValidation : null;
-  const testStandard = validatedData
-    ? mockTestStandards.find(t => t.name === validatedData.testType)
-    : null;
-
-  const handleValidateCode = () => {
+  const handleValidateCode = async () => {
     if (assessmentCode.length !== 12) return;
 
     setIsValidating(true);
-    // Simulate API call
-    setTimeout(() => {
-      // For demo, accept any 12-char code
-      if (assessmentCode.length === 12) {
+    try {
+      const response = await validateCode(assessmentCode);
+      if (response.success && response.data && response.data.valid) {
         setCodeValid(true);
+        setValidatedData(response.data);
         // Initialize test parameters based on test standard
-        if (mockCodeValidation.testsIncluded) {
-          const initialParams = mockCodeValidation.testsIncluded.map((test, idx) => ({
+        const testsIncluded = response.data.testStandard?.testsIncluded || [];
+        if (testsIncluded.length > 0) {
+          const initialParams = testsIncluded.map((test, idx) => ({
             id: `param-${idx}`,
             parameter: test,
             value: "",
@@ -58,11 +54,34 @@ export function UploadResultsDialog({ open, onOpenChange }: UploadResultsDialogP
             status: "normal" as const,
           }));
           setTestParameters(initialParams);
+        } else {
+          // Default to one empty parameter if no tests specified
+          setTestParameters([{
+            id: `param-0`,
+            parameter: "",
+            value: "",
+            referenceRange: "",
+            status: "normal" as const,
+          }]);
         }
         setStep("upload");
+      } else {
+        toast({
+          title: "Invalid Code",
+          description: response.data?.message || response.error || "This code is not valid or has expired",
+          variant: "destructive",
+        });
       }
+    } catch (error) {
+      console.error("Failed to validate code:", error);
+      toast({
+        title: "Validation Failed",
+        description: "Unable to validate the code. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsValidating(false);
-    }, 1000);
+    }
   };
 
   const getDefaultReference = (testName: string): string => {
@@ -275,7 +294,7 @@ export function UploadResultsDialog({ open, onOpenChange }: UploadResultsDialogP
                 </div>
                 <div>
                   <span className="text-muted-foreground">Test: </span>
-                  <span className="font-medium">{validatedData.testType}</span>
+                  <span className="font-medium">{validatedData.testStandard?.name || "Unknown"}</span>
                 </div>
               </div>
             </Card>
@@ -424,7 +443,7 @@ export function UploadResultsDialog({ open, onOpenChange }: UploadResultsDialogP
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Test Type:</span>
-                  <span>{validatedData.testType}</span>
+                  <span>{validatedData.testStandard?.name || "Unknown"}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Document Attached:</span>

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,13 +17,22 @@ import {
   Gift,
   Building2,
   XCircle,
+  LogOut,
+  Loader2,
 } from "lucide-react";
 import { PurchaseCodesDialog } from "@/components/purchase-codes-dialog";
 import { FundWalletDialog } from "@/components/fund-wallet-dialog";
 import { PriveScreenLogo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { mockSponsoredCodes, mockWallet, mockDiagnosticCenters, mockSponsorTestRequests, mockTestStandards } from "@/lib/mock-data";
+import {
+  useCurrentUser,
+  useWallet,
+  useSponsorProfile,
+  useSponsorTestRequests,
+  useLogout
+} from "@/lib/api/hooks";
+import { getAuthToken, clearAuthTokens } from "@/lib/api/config";
 
 // Helper to hash name: FirstName L***
 function hashName(fullName: string): string {
@@ -39,7 +48,34 @@ export default function SponsorHome() {
   const [showPurchase, setShowPurchase] = useState(false);
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [declinedRequests, setDeclinedRequests] = useState<string[]>([]);
-  const sponsoredCodes = mockSponsoredCodes;
+
+  // Check auth on mount
+  useEffect(() => {
+    const token = getAuthToken();
+    if (!token) {
+      window.location.href = '/auth';
+    }
+  }, []);
+
+  // API hooks
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+  const { data: wallet, isLoading: walletLoading } = useWallet();
+  const { data: sponsorProfile, isLoading: profileLoading } = useSponsorProfile();
+  const { data: testRequests, isLoading: requestsLoading } = useSponsorTestRequests(0, 50);
+  const logoutMutation = useLogout();
+
+  const handleLogout = () => {
+    logoutMutation.mutate(undefined, {
+      onSuccess: () => {
+        clearAuthTokens();
+        window.location.href = '/auth';
+      },
+      onError: () => {
+        clearAuthTokens();
+        window.location.href = '/auth';
+      }
+    });
+  };
 
   const handleDeclineRequest = (requestId: string, patientName: string) => {
     setDeclinedRequests(prev => [...prev, requestId]);
@@ -48,19 +84,24 @@ export default function SponsorHome() {
       description: `You have declined the sponsorship request from ${hashName(patientName)}. They will be notified.`,
     });
   };
-  const wallet = mockWallet;
-  const walletLoading = false;
 
-  const pendingCodes = sponsoredCodes.filter(c => c.status === 'pending').length;
-  const completedCodes = sponsoredCodes.filter(c => c.status === 'completed').length;
-  const sharedWithYou = sponsoredCodes.filter(c => c.status === 'completed' && c.sharedWithSponsor).length;
+  // Calculate stats from test requests
+  const requests = testRequests?.content || [];
+  const totalCodes = requests.reduce((sum, req) => sum + req.totalCodes, 0);
+  const usedCodes = requests.reduce((sum, req) => sum + req.usedCodes, 0);
+  const pendingCodes = totalCodes - usedCodes;
 
-  // Get center info for a code
-  const getCenterForCode = (code: typeof sponsoredCodes[0]) => {
-    // Mock: assign centers based on code
-    const centerIndex = code.id.charCodeAt(code.id.length - 1) % mockDiagnosticCenters.length;
-    return mockDiagnosticCenters[centerIndex];
-  };
+  // Loading state
+  if (userLoading || profileLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading sponsor dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -75,11 +116,14 @@ export default function SponsorHome() {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {user && (
+                <span className="text-sm text-muted-foreground hidden md:inline">
+                  {sponsorProfile?.companyName || `${user.firstName} ${user.lastName}`}
+                </span>
+              )}
               <ThemeToggle />
-              <Button variant="ghost" size="icon" data-testid="button-back" asChild>
-                <a href="/">
-                  <ArrowLeft className="h-5 w-5" />
-                </a>
+              <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
+                <LogOut className="h-5 w-5" />
               </Button>
             </div>
           </div>
@@ -88,7 +132,9 @@ export default function SponsorHome() {
 
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-8">
-          <h2 className="text-3xl font-semibold mb-2">Sponsor Dashboard</h2>
+          <h2 className="text-3xl font-semibold mb-2">
+            {sponsorProfile?.companyName ? `${sponsorProfile.companyName} Dashboard` : 'Sponsor Dashboard'}
+          </h2>
           <p className="text-muted-foreground">Provide sexual health testing while respecting privacy</p>
         </div>
 
@@ -127,7 +173,11 @@ export default function SponsorHome() {
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-total-codes">{sponsoredCodes.length}</div>
+              {requestsLoading ? (
+                <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+              ) : (
+                <div className="text-3xl font-bold" data-testid="text-total-codes">{totalCodes}</div>
+              )}
             </CardContent>
           </Card>
 
@@ -137,7 +187,11 @@ export default function SponsorHome() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-pending">{pendingCodes}</div>
+              {requestsLoading ? (
+                <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+              ) : (
+                <div className="text-3xl font-bold" data-testid="text-pending">{pendingCodes}</div>
+              )}
             </CardContent>
           </Card>
 
@@ -147,18 +201,30 @@ export default function SponsorHome() {
               <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold" data-testid="text-completed">{completedCodes}</div>
+              {requestsLoading ? (
+                <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+              ) : (
+                <div className="text-3xl font-bold" data-testid="text-completed">{usedCodes}</div>
+              )}
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Results Shared</CardTitle>
+              <CardTitle className="text-sm font-medium">Active Requests</CardTitle>
               <Eye className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-primary" data-testid="text-shared">{sharedWithYou}</div>
-              <p className="text-xs text-muted-foreground mt-1">of {completedCodes} completed</p>
+              {requestsLoading ? (
+                <div className="h-8 w-16 bg-muted animate-pulse rounded" />
+              ) : (
+                <>
+                  <div className="text-3xl font-bold text-primary" data-testid="text-shared">
+                    {requests.filter(r => r.status === 'active').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">of {requests.length} total</p>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -221,223 +287,86 @@ export default function SponsorHome() {
           </CardContent>
         </Card>
 
-        {/* Incoming Sponsorship Requests from Patients */}
-        {mockSponsorTestRequests.filter(r => r.status === 'pending' && !declinedRequests.includes(r.id)).length > 0 && (
-          <Card className="mb-8 border-blue-200 dark:border-blue-800">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Gift className="h-5 w-5 text-blue-600" />
-                    Incoming Sponsorship Requests
-                  </CardTitle>
-                  <CardDescription>
-                    Patients have requested that you sponsor their tests
-                  </CardDescription>
-                </div>
-                <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">
-                  {mockSponsorTestRequests.filter(r => r.status === 'pending' && !declinedRequests.includes(r.id)).length} Pending
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {mockSponsorTestRequests.filter(r => r.status === 'pending' && !declinedRequests.includes(r.id)).map((request) => {
-                  const center = mockDiagnosticCenters.find(c => c.id === request.centerId);
-                  const testPkg = mockTestStandards.find(t => t.id === request.testPackageId);
-                  return (
-                    <div
-                      key={request.id}
-                      className="p-4 border rounded-lg bg-blue-50/50 dark:bg-blue-950/20"
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold">{hashName(request.patientName)}</h3>
-                            <Badge variant="outline" className="text-blue-600 border-blue-300">
-                              Awaiting Response
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-muted-foreground font-mono">
-                            Code: {request.code}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-primary">₦{parseFloat(request.testPrice).toLocaleString()}</p>
-                          <p className="text-xs text-muted-foreground">Requested amount</p>
-                        </div>
-                      </div>
-
-                      <div className="grid sm:grid-cols-2 gap-4 text-sm mb-4">
-                        <div className="flex items-start gap-2">
-                          <Building2 className="h-4 w-4 text-muted-foreground mt-0.5" />
-                          <div>
-                            <p className="text-muted-foreground">Center</p>
-                            <p className="font-medium">{center?.name}</p>
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Test Package</p>
-                          <p className="font-medium">{testPkg?.name}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Requested</p>
-                          <p>{request.createdAt.toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                          <p className="text-muted-foreground">Expires</p>
-                          <p>{request.expiresAt.toLocaleDateString()}</p>
-                        </div>
-                      </div>
-
-                      {request.message && (
-                        <div className="p-3 bg-background rounded border mb-4">
-                          <p className="text-sm italic text-muted-foreground">"{request.message}"</p>
-                        </div>
-                      )}
-
-                      <div className="flex gap-3">
-                        <Button size="sm" asChild>
-                          <a href={`/sponsor-request/${request.code}`}>
-                            <CheckCircle2 className="h-4 w-4 mr-2" />
-                            Review & Accept
-                          </a>
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeclineRequest(request.id, request.patientName)}
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Decline
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
+        {/* Test Requests List */}
         <Card>
           <CardHeader>
-            <CardTitle>Sponsored Assessment Codes</CardTitle>
+            <CardTitle>Test Requests</CardTitle>
             <CardDescription>
               Track codes you've purchased and their completion status
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {sponsoredCodes.map((item) => {
-                const center = getCenterForCode(item);
-                return (
+            {requestsLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
+                ))}
+              </div>
+            ) : requests.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                <h3 className="text-lg font-medium mb-2">No Test Requests Yet</h3>
+                <p className="text-muted-foreground mb-4">
+                  Purchase assessment codes to sponsor health tests for your employees or beneficiaries.
+                </p>
+                <Button onClick={() => setShowPurchase(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Purchase Codes
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {requests.map((request) => (
                   <div
-                    key={item.id}
+                    key={request.id}
                     className="p-4 border rounded-lg hover-elevate"
-                    data-testid={`card-sponsored-${item.id}`}
+                    data-testid={`card-request-${request.id}`}
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          {/* Show hashed name: FirstName L*** */}
-                          <h3 className="font-semibold" data-testid={`text-recipient-${item.id}`}>
-                            {hashName(item.recipientName)}
-                          </h3>
-                          <Badge variant={item.status === 'completed' ? 'default' : 'secondary'} data-testid={`badge-status-${item.id}`}>
-                            {item.status === 'completed' ? 'Completed' : 'Pending'}
+                          <h3 className="font-semibold">{request.title}</h3>
+                          <Badge variant={request.status === 'completed' ? 'default' : request.status === 'active' ? 'secondary' : 'destructive'}>
+                            {request.status === 'completed' ? 'Completed' : request.status === 'active' ? 'Active' : 'Cancelled'}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground font-mono" data-testid={`text-code-${item.id}`}>
-                          Code: {item.code}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <p className="text-muted-foreground mb-1">Test Type</p>
-                        <p className="font-medium" data-testid={`text-test-type-${item.id}`}>{item.testType}</p>
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground mb-1">Sent</p>
-                        <p data-testid={`text-sent-${item.id}`}>{item.sentAt.toLocaleDateString()}</p>
-                      </div>
-                      {item.status === 'completed' && item.completedAt && (
-                        <>
-                          <div>
-                            <p className="text-muted-foreground mb-1">Center</p>
-                            <p className="font-medium">{center?.name}</p>
-                          </div>
-                          <div>
-                            <p className="text-muted-foreground mb-1">Test Date</p>
-                            <p data-testid={`text-completed-${item.id}`}>{item.completedAt.toLocaleDateString()}</p>
-                          </div>
-                        </>
-                      )}
-                    </div>
-
-                    {item.status === 'completed' && (
-                      <div className={`mt-3 p-3 rounded-md text-sm ${
-                        item.sharedWithSponsor
-                          ? 'bg-primary/10 border border-primary/20'
-                          : 'bg-muted/50'
-                      }`}>
-                        {item.sharedWithSponsor ? (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 text-primary">
-                                <Eye className="h-4 w-4" />
-                                <span className="font-medium">Results Shared by Patient</span>
-                              </div>
-                              <Button
-                                size="sm"
-                                asChild
-                                data-testid={`button-view-results-${item.id}`}
-                              >
-                                <a href={`/results/${item.resultId}?view=sponsor`}>
-                                  <Eye className="h-4 w-4 mr-2" />
-                                  View Results
-                                </a>
-                              </Button>
-                            </div>
-                            <p className="text-muted-foreground mt-1">
-                              Patient has granted you access to view their anonymous results.
-                            </p>
-                            <div className="mt-2 p-2 bg-background rounded border">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-muted-foreground">Assessment Code:</span>
-                                <span className="font-mono font-semibold">{item.code}</span>
-                              </div>
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Overall Status:</span>
-                                <Badge variant="default">{item.overallStatus}</Badge>
-                              </div>
-                              {item.shareExpiresAt && (
-                                <p className="text-xs text-muted-foreground mt-2">
-                                  Access expires: {item.shareExpiresAt.toLocaleDateString()}
-                                </p>
-                              )}
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                              <Lock className="h-4 w-4" />
-                              <span className="font-medium">Privacy Firewall Active</span>
-                            </div>
-                            <p className="text-muted-foreground mt-1">
-                              Test completed. Patient has not shared medical results with you.
-                              You will only see results if the patient grants consent.
-                            </p>
-                          </>
+                        {request.description && (
+                          <p className="text-sm text-muted-foreground">{request.description}</p>
                         )}
                       </div>
-                    )}
+                      <div className="text-right">
+                        <p className="text-lg font-bold">₦{parseFloat(request.totalAmount).toLocaleString()}</p>
+                        <p className="text-xs text-muted-foreground">{request.currency}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid sm:grid-cols-3 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground mb-1">Total Codes</p>
+                        <p className="font-medium">{request.totalCodes}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Used</p>
+                        <p className="font-medium">{request.usedCodes} / {request.totalCodes}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground mb-1">Valid Until</p>
+                        <p>{new Date(request.validUntil).toLocaleDateString()}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex gap-2">
+                      <Button size="sm" variant="outline" asChild>
+                        <a href={`/sponsor/requests/${request.id}`}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Codes
+                        </a>
+                      </Button>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

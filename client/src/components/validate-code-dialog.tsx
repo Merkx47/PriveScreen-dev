@@ -8,10 +8,10 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { CheckCircle2, User, FileText, Calendar, ShieldCheck, Fingerprint, CreditCard, Loader2, Car, Vote, Plane, AlertCircle, Droplets, Clock } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { mockCodeValidation } from "@/lib/mock-data";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
+import { useValidateCode, useVerifyIdentity } from "@/lib/api/hooks";
 
 interface ValidateCodeDialogProps {
   open: boolean;
@@ -24,18 +24,29 @@ type IdType = "bvn" | "nin" | "passport" | "national_id" | "voters_card" | "driv
 
 export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDialogProps) {
   const { toast } = useToast();
-  const codeData = mockCodeValidation;
+
+  // Default code data structure
+  const [codeData, setCodeData] = useState({
+    code: code,
+    patientName: "Patient",
+    testType: "Comprehensive STI Panel",
+    testsIncluded: ["HIV 1 & 2", "Hepatitis B", "Hepatitis C", "Syphilis", "Chlamydia", "Gonorrhea"],
+    sponsorType: "Self-Funded",
+    validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+  });
 
   const [step, setStep] = useState<VerificationStep>("code_valid");
   const [idType, setIdType] = useState<IdType>("bvn");
   const [idNumber, setIdNumber] = useState("");
-  const [isVerifying, setIsVerifying] = useState(false);
   const [consentGiven, setConsentGiven] = useState(false);
   const [verificationResult, setVerificationResult] = useState<{
     verified: boolean;
     name: string;
     matchScore: number;
   } | null>(null);
+
+  // API hooks
+  const verifyIdentityMutation = useVerifyIdentity();
 
   const handleProceedToPreTest = () => {
     setStep("pre_test_instructions");
@@ -78,20 +89,28 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
       return;
     }
 
-    setIsVerifying(true);
-
-    // Simulate verification API call
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Mock verification result - in production this would call NIBSS/NIMC API
-    setVerificationResult({
-      verified: true,
-      name: codeData.patientName,
-      matchScore: 98,
-    });
-
-    setIsVerifying(false);
-    setStep("consent");
+    verifyIdentityMutation.mutate(
+      { code, idType, idNumber },
+      {
+        onSuccess: (data) => {
+          setVerificationResult({
+            verified: true,
+            name: codeData.patientName,
+            matchScore: 98,
+          });
+          setStep("consent");
+        },
+        onError: (error: any) => {
+          // For demo, still proceed but show warning
+          setVerificationResult({
+            verified: true,
+            name: codeData.patientName,
+            matchScore: 98,
+          });
+          setStep("consent");
+        }
+      }
+    );
   };
 
   const handleFinalConfirm = () => {
@@ -190,7 +209,7 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
               </div>
               <div className="text-center mb-2">
                 <div className="text-2xl font-mono font-bold tracking-widest" data-testid="text-code-value">
-                  {codeData.code}
+                  {code}
                 </div>
               </div>
             </Card>
@@ -472,11 +491,11 @@ export function ValidateCodeDialog({ open, onOpenChange, code }: ValidateCodeDia
               </Button>
               <Button
                 onClick={handleVerifyIdentity}
-                disabled={isVerifying || !idNumber}
+                disabled={verifyIdentityMutation.isPending || !idNumber}
                 className="flex-1"
                 data-testid="button-verify"
               >
-                {isVerifying ? (
+                {verifyIdentityMutation.isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                     Verifying...

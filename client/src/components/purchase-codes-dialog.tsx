@@ -5,12 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Clock, ShieldCheck, AlertTriangle, Edit2, Info, Heart, MapPin, Star, ArrowLeft, Building2 } from "lucide-react";
+import { CheckCircle2, Clock, ShieldCheck, AlertTriangle, Edit2, Info, Heart, MapPin, Star, ArrowLeft, Building2, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { mockTestStandards, mockDiagnosticCenters, getCenterTestPrice } from "@/lib/mock-data";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useDiagnosticCenters, useTestStandards, useCreateTestRequest } from "@/lib/api/hooks";
 
 interface PurchaseCodesDialogProps {
   open: boolean;
@@ -29,16 +29,21 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
   const [testType, setTestType] = useState("");
   const [quantity, setQuantity] = useState("1");
   const [acceptedConfidentiality, setAcceptedConfidentiality] = useState(false);
-  const tests = mockTestStandards;
-  const centers = mockDiagnosticCenters;
+
+  // API hooks
+  const { data: centersData, isLoading: centersLoading } = useDiagnosticCenters(0, 50);
+  const { data: testsData, isLoading: testsLoading } = useTestStandards(0, 50);
+  const createTestRequestMutation = useCreateTestRequest();
+
+  const tests = testsData?.content || [];
+  const centers = centersData?.content || [];
 
   const selectedCenterData = centers.find(c => c.id === selectedCenter);
 
   // Get center-specific price for a test
   const getTestPrice = (testStandardId: string): string => {
-    if (!selectedCenter) return "0";
-    const centerPrice = getCenterTestPrice(selectedCenter, testStandardId);
-    return centerPrice || tests.find(t => t.id === testStandardId)?.price || "0";
+    const test = tests.find(t => t.id === testStandardId);
+    return test?.price || "0";
   };
 
   const selectedTest = tests.find(t => t.id === testType);
@@ -70,12 +75,32 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
       return;
     }
 
-    toast({
-      title: "Codes Purchased",
-      description: `Assessment code for ${selectedCenterData?.name} sent to ${recipientContact}. Valid for 72 hours.`,
-    });
-    onOpenChange(false);
-    resetForm();
+    // Make API call
+    createTestRequestMutation.mutate(
+      {
+        title: `Test for ${firstName} ${lastName}`,
+        description: `Sponsored test sent to ${recipientContact}`,
+        tests: [{ testId: testType, quantity: parseInt(quantity), pricePerCode: testPrice.toString() }],
+        validityDays: 3, // 72 hours
+      },
+      {
+        onSuccess: () => {
+          toast({
+            title: "Codes Purchased",
+            description: `Assessment code for ${selectedCenterData?.name} sent to ${recipientContact}. Valid for 72 hours.`,
+          });
+          onOpenChange(false);
+          resetForm();
+        },
+        onError: (error: any) => {
+          toast({
+            title: "Purchase Failed",
+            description: error.message || "Failed to purchase codes. Please try again.",
+            variant: "destructive",
+          });
+        }
+      }
+    );
   };
 
   const resetForm = () => {
@@ -122,7 +147,11 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
         </DialogHeader>
 
         <div className="space-y-6">
-          {step === "select-center" ? (
+          {centersLoading || testsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : step === "select-center" ? (
             /* Step 1: Center Selection */
             <div className="space-y-4">
               {/* Voluntary Testing Reminder */}
@@ -163,14 +192,18 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
                             <span>{center.address}, {center.city}</span>
                           </div>
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-                              {center.rating}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3.5 w-3.5" />
-                              {center.hours}
-                            </span>
+                            {center.rating && (
+                              <span className="flex items-center gap-1">
+                                <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                                {center.rating}
+                              </span>
+                            )}
+                            {center.operatingHours && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-3.5 w-3.5" />
+                                {center.operatingHours}
+                              </span>
+                            )}
                           </div>
                         </div>
                         <Button variant="outline" size="sm">
@@ -248,9 +281,17 @@ export function PurchaseCodesDialog({ open, onOpenChange }: PurchaseCodesDialogP
                 <Button
                   onClick={handlePurchase}
                   className="flex-1"
+                  disabled={createTestRequestMutation.isPending}
                   data-testid="button-confirm-send"
                 >
-                  Confirm & Send
+                  {createTestRequestMutation.isPending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Confirm & Send"
+                  )}
                 </Button>
               </div>
             </div>

@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PriveScreenLogo } from "@/components/logo";
-import { mockCodeValidation } from "@/lib/mock-data";
+import { validateCode, type CodeValidation } from "@/lib/api/codes";
 
 interface TestEntry {
   id: string;
@@ -35,27 +35,39 @@ export default function UploadResults() {
   const [assessmentCode, setAssessmentCode] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [codeValid, setCodeValid] = useState(false);
+  const [validatedData, setValidatedData] = useState<CodeValidation | null>(null);
   const [tests, setTests] = useState<TestEntry[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get test type from validated code
-  const validatedData = codeValid ? mockCodeValidation : null;
-
-  const handleValidateCode = () => {
+  const handleValidateCode = async () => {
     if (assessmentCode.length !== 12) return;
 
     setIsValidating(true);
-    // Simulate API call
-    setTimeout(() => {
-      // For demo, accept any 12-char code
-      if (assessmentCode.length === 12) {
+    try {
+      const response = await validateCode(assessmentCode);
+      if (response.success && response.data && response.data.valid) {
         setCodeValid(true);
+        setValidatedData(response.data);
         // Initialize with one empty test entry
         setTests([createEmptyTest()]);
         setStep("results");
+      } else {
+        toast({
+          title: "Invalid Code",
+          description: response.data?.message || response.error || "This code is not valid or has expired",
+          variant: "destructive",
+        });
       }
+    } catch (error) {
+      console.error("Failed to validate code:", error);
+      toast({
+        title: "Validation Failed",
+        description: "Unable to validate the code. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
       setIsValidating(false);
-    }, 1000);
+    }
   };
 
   const createEmptyTest = (): TestEntry => ({
@@ -257,11 +269,11 @@ export default function UploadResults() {
                   </div>
                   <div>
                     <span className="text-muted-foreground">Test: </span>
-                    <span className="font-medium">{validatedData.testType}</span>
+                    <span className="font-medium">{validatedData.testStandard?.name || "Unknown"}</span>
                   </div>
                   <div>
                     <span className="text-muted-foreground">Valid Until: </span>
-                    <span className="font-medium">{validatedData.validUntil.toLocaleDateString()}</span>
+                    <span className="font-medium">{new Date(validatedData.validUntil).toLocaleDateString()}</span>
                   </div>
                 </div>
               </CardContent>
@@ -379,7 +391,7 @@ export default function UploadResults() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground mb-1">Test Type</p>
-                    <p className="font-medium">{validatedData.testType}</p>
+                    <p className="font-medium">{validatedData.testStandard?.name || "Unknown"}</p>
                   </div>
                 </div>
 

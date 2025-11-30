@@ -1,5 +1,6 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +18,8 @@ import {
   Clock,
   CheckCircle2,
   BookOpen,
-  HandCoins
+  HandCoins,
+  LogOut
 } from "lucide-react";
 import { FundWalletDialog } from "@/components/fund-wallet-dialog";
 import { PriveScreenLogo } from "@/components/logo";
@@ -27,24 +29,45 @@ import { RequestSponsorDialog } from "@/components/request-sponsor-dialog";
 import { AssessmentCodeCard } from "@/components/assessment-code-card";
 import { TestResultCard } from "@/components/test-result-card";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { mockUser, mockWallet, mockAssessmentCodes, mockTestResults } from "@/lib/mock-data";
+import { useCurrentUser, useWallet, useMyActiveCodes, useMyResults, useLogout } from "@/lib/api/hooks";
+import { getAuthToken } from "@/lib/api/config";
 
 export default function PatientHome() {
+  const [, setLocation] = useLocation();
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [showOrderTest, setShowOrderTest] = useState(false);
   const [showActivateCode, setShowActivateCode] = useState(false);
   const [showRequestSponsor, setShowRequestSponsor] = useState(false);
 
-  const user = mockUser;
-  const wallet = mockWallet;
-  const walletLoading = false;
-  const codes = mockAssessmentCodes;
-  const codesLoading = false;
-  const results = mockTestResults;
-  const resultsLoading = false;
+  // Check auth
+  useEffect(() => {
+    if (!getAuthToken()) {
+      setLocation('/auth/patient');
+    }
+  }, [setLocation]);
 
-  const activeCode = codes.find(c => c.status === 'pending');
+  // API queries
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+  const { data: wallet, isLoading: walletLoading } = useWallet();
+  const { data: codes, isLoading: codesLoading } = useMyActiveCodes();
+  const { data: resultsData, isLoading: resultsLoading } = useMyResults(0, 10);
+  const logoutMutation = useLogout();
+
+  const results = resultsData?.content || [];
+  const activeCode = codes?.find(c => c.status === 'pending');
   const newResults = results.filter(r => !r.viewed);
+
+  const handleLogout = async () => {
+    await logoutMutation.mutateAsync();
+    setLocation('/');
+  };
+
+  // Format wallet balance
+  const formatBalance = (balance: string | undefined) => {
+    if (!balance) return '0.00';
+    const num = parseFloat(balance);
+    return num.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,6 +83,9 @@ export default function PatientHome() {
             </div>
             <div className="flex items-center gap-2">
               <ThemeToggle />
+              <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
+                <LogOut className="h-5 w-5" />
+              </Button>
               <Button variant="ghost" size="icon" data-testid="button-back" asChild>
                 <a href="/">
                   <ArrowLeft className="h-5 w-5" />
@@ -72,7 +98,13 @@ export default function PatientHome() {
 
       <main className="container mx-auto px-4 py-8 max-w-7xl">
         <div className="mb-8">
-          <h2 className="text-3xl font-semibold mb-2">Welcome back, {user.firstName || 'Patient'}</h2>
+          {userLoading ? (
+            <Skeleton className="h-10 w-64 mb-2" />
+          ) : (
+            <h2 className="text-3xl font-semibold mb-2">
+              Welcome back, {user?.firstName || 'Patient'}
+            </h2>
+          )}
           <p className="text-muted-foreground">Your private sexual health dashboard</p>
         </div>
 
@@ -88,7 +120,7 @@ export default function PatientHome() {
               ) : (
                 <div className="space-y-4">
                   <div className="text-3xl font-bold" data-testid="text-balance">
-                    ₦{wallet?.balance || '0.00'}
+                    ₦{formatBalance(wallet?.balance)}
                   </div>
                   <Button
                     onClick={() => setShowFundWallet(true)}
@@ -238,7 +270,7 @@ export default function PatientHome() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">My Assessment Codes</h3>
-              {codes.length > 0 && (
+              {codes && codes.length > 0 && (
                 <Badge variant="secondary" data-testid="badge-codes-count">{codes.length}</Badge>
               )}
             </div>
@@ -247,7 +279,7 @@ export default function PatientHome() {
                 <Skeleton className="h-32 w-full" />
                 <Skeleton className="h-32 w-full" />
               </div>
-            ) : codes.length === 0 ? (
+            ) : !codes || codes.length === 0 ? (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />

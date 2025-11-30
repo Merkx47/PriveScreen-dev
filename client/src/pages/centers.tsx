@@ -5,10 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { MapPin, Phone, Mail, Clock, Star, Navigation, ArrowLeft, MessageSquarePlus } from "lucide-react";
-import { mockDiagnosticCenters } from "@/lib/mock-data";
+import { MapPin, Phone, Mail, Clock, Star, Navigation, ArrowLeft, MessageSquarePlus, Loader2 } from "lucide-react";
 import { RateCenterDialog } from "@/components/rate-center-dialog";
 import { PriveScreenLogo } from "@/components/logo";
+import { useDiagnosticCenters } from "@/lib/api/hooks";
 import type { DiagnosticCenter } from "@shared/schema";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
@@ -59,11 +59,14 @@ export default function Centers() {
   const searchString = useSearch();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCenter, setSelectedCenter] = useState<DiagnosticCenter | null>(null);
-  const [centers] = useState<DiagnosticCenter[]>(mockDiagnosticCenters);
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   const markerRefs = useRef<{ [key: string]: L.Marker | null }>({});
   const [showRateDialog, setShowRateDialog] = useState(false);
   const [centerToRate, setCenterToRate] = useState<DiagnosticCenter | null>(null);
+
+  // API hooks
+  const { data: centersData, isLoading } = useDiagnosticCenters(0, 100);
+  const centers = centersData?.content || [];
 
   // Determine back destination based on where user came from
   const getBackDestination = () => {
@@ -137,89 +140,97 @@ export default function Centers() {
           <div className="space-y-4 order-2 lg:order-1">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Approved Centers</h2>
-              <Badge variant="secondary" data-testid="badge-count">{filteredCenters.length} centers</Badge>
+              <Badge variant="secondary" data-testid="badge-count">
+                {isLoading ? '...' : `${filteredCenters.length} centers`}
+              </Badge>
             </div>
 
-            <div className="space-y-4 max-h-[600px] overflow-y-auto p-1">
-              {filteredCenters.map((center) => (
-                <Card
-                  key={center.id}
-                  className={`cursor-pointer transition-all hover-elevate ${
-                    selectedCenter?.id === center.id ? 'ring-2 ring-primary' : ''
-                  }`}
-                  onClick={() => handleSelectCenter(center)}
-                  data-testid={`card-center-${center.id}`}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <CardTitle className="text-lg">{center.name}</CardTitle>
-                          {center.verified && (
-                            <Badge variant="default" className="text-xs" data-testid="badge-verified">
-                              Verified
-                            </Badge>
-                          )}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[600px] overflow-y-auto p-1">
+                {filteredCenters.map((center) => (
+                  <Card
+                    key={center.id}
+                    className={`cursor-pointer transition-all hover-elevate ${
+                      selectedCenter?.id === center.id ? 'ring-2 ring-primary' : ''
+                    }`}
+                    onClick={() => handleSelectCenter(center)}
+                    data-testid={`card-center-${center.id}`}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <CardTitle className="text-lg">{center.name}</CardTitle>
+                            {center.verified && (
+                              <Badge variant="default" className="text-xs" data-testid="badge-verified">
+                                Verified
+                              </Badge>
+                            )}
+                          </div>
+                          <CardDescription>{center.address}, {center.city}</CardDescription>
                         </div>
-                        <CardDescription>{center.address}, {center.city}</CardDescription>
+                        <div className="flex items-center gap-1">
+                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-sm font-medium">{center.rating || 'N/A'}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                        <span className="text-sm font-medium">{center.rating}</span>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{center.phone}</span>
-                    </div>
-                    {center.email && (
+                    </CardHeader>
+                    <CardContent className="space-y-2">
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Mail className="h-4 w-4" />
-                        <span>{center.email}</span>
+                        <Phone className="h-4 w-4" />
+                        <span>{center.phone}</span>
                       </div>
-                    )}
-                    {center.hours && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <span>{center.hours}</span>
+                      {center.email && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Mail className="h-4 w-4" />
+                          <span>{center.email}</span>
+                        </div>
+                      )}
+                      {center.operatingHours && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Clock className="h-4 w-4" />
+                          <span>{center.operatingHours}</span>
+                        </div>
+                      )}
+                      <div className="pt-2 flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          data-testid={`button-directions-${center.id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (center.latitude && center.longitude) {
+                              window.open(
+                                `https://www.google.com/maps/dir/?api=1&destination=${center.latitude},${center.longitude}`,
+                                '_blank'
+                              );
+                            }
+                          }}
+                        >
+                          <Navigation className="h-4 w-4 mr-2" />
+                          Directions
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          className="flex-1"
+                          data-testid={`button-rate-${center.id}`}
+                          onClick={(e) => handleRateCenter(center, e)}
+                        >
+                          <MessageSquarePlus className="h-4 w-4 mr-2" />
+                          Rate
+                        </Button>
                       </div>
-                    )}
-                    <div className="pt-2 flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        data-testid={`button-directions-${center.id}`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (center.latitude && center.longitude) {
-                            window.open(
-                              `https://www.google.com/maps/dir/?api=1&destination=${center.latitude},${center.longitude}`,
-                              '_blank'
-                            );
-                          }
-                        }}
-                      >
-                        <Navigation className="h-4 w-4 mr-2" />
-                        Directions
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="flex-1"
-                        data-testid={`button-rate-${center.id}`}
-                        onClick={(e) => handleRateCenter(center, e)}
-                      >
-                        <MessageSquarePlus className="h-4 w-4 mr-2" />
-                        Rate
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="order-1 lg:order-2 h-[600px] rounded-lg overflow-hidden border">
@@ -253,7 +264,7 @@ export default function Centers() {
                         <p className="text-sm text-gray-600 mb-2">{center.address}</p>
                         <div className="flex items-center gap-1 mb-2">
                           <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
-                          <span className="text-xs font-medium">{center.rating}</span>
+                          <span className="text-xs font-medium">{center.rating || 'N/A'}</span>
                         </div>
                         <p className="text-xs text-gray-500 mb-2">{center.phone}</p>
                         <Button

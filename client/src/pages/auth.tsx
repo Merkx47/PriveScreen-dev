@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Mail, Lock, User, Phone, Building2 } from "lucide-react";
+import { ArrowLeft, Mail, Lock, User, Phone, Building2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { CenterOnboardingDialog } from "@/components/center-onboarding-dialog";
 import { PriveScreenLogo } from "@/components/logo";
+import { useLogin, useRegister, useGoogleAuth } from "@/lib/api/hooks";
+import { getGoogleOAuthUrl, getMicrosoftOAuthUrl, resendVerificationEmail, forgotPassword } from "@/lib/api/auth";
 
 // SVG icons for SSO providers
 const GoogleIcon = () => (
@@ -65,14 +67,25 @@ const portalConfig = {
 export default function Auth({ portalType }: AuthPageProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
   const [showOnboarding, setShowOnboarding] = useState(false);
+
+  // Email verification state
+  const [showVerificationPending, setShowVerificationPending] = useState(false);
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+  const [resendingVerification, setResendingVerification] = useState(false);
+
+  // Forgot password state
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
+  const [sendingResetEmail, setSendingResetEmail] = useState(false);
 
   // Form states
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [signupName, setSignupName] = useState("");
+  const [signupFirstName, setSignupFirstName] = useState("");
+  const [signupLastName, setSignupLastName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPhone, setSignupPhone] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
@@ -80,69 +93,67 @@ export default function Auth({ portalType }: AuthPageProps) {
 
   const config = portalConfig[portalType];
 
-  // Mock SSO authentication
+  // API mutations
+  const loginMutation = useLogin();
+  const registerMutation = useRegister();
+
+  // SSO authentication - redirect to OAuth provider
   const handleSSO = async (provider: string) => {
-    setIsLoading(true);
-
-    // Simulate SSO authentication delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
-
+    // All SSO providers coming soon for now
     toast({
-      title: "Authentication Successful",
-      description: `Signed in with ${provider}`,
+      title: "Coming Soon",
+      description: `${provider} Sign In will be available soon`,
     });
-
-    // Store mock auth state
-    localStorage.setItem("authUser", JSON.stringify({
-      id: "user-" + Math.random().toString(36).substr(2, 9),
-      email: `user@${provider.toLowerCase()}.com`,
-      name: "Demo User",
-      role: portalType,
-      provider: provider
-    }));
-
-    setIsLoading(false);
-    setLocation(config.redirectPath);
   };
 
-  // Mock email/password login
+  // Email/password login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
-    // Simulate login delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    if (loginEmail && loginPassword) {
-      toast({
-        title: "Login Successful",
-        description: "Welcome back!",
-      });
-
-      localStorage.setItem("authUser", JSON.stringify({
-        id: "user-" + Math.random().toString(36).substr(2, 9),
-        email: loginEmail,
-        name: loginEmail.split("@")[0],
-        role: portalType,
-        provider: "email"
-      }));
-
-      setLocation(config.redirectPath);
-    } else {
+    if (!loginEmail || !loginPassword) {
       toast({
         title: "Login Failed",
-        description: "Please enter valid credentials",
+        description: "Please enter your email and password",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      const response = await loginMutation.mutateAsync({
+        email: loginEmail,
+        password: loginPassword,
+      });
+
+      if (response.success) {
+        toast({
+          title: "Login Successful",
+          description: "Welcome back!",
+        });
+
+        // Redirect based on user role
+        const userRole = response.data.user.role;
+        if (userRole === 'admin') {
+          setLocation('/admin');
+        } else if (userRole === portalType) {
+          setLocation(config.redirectPath);
+        } else {
+          // Redirect to appropriate portal based on actual role
+          setLocation(`/${userRole}`);
+        }
+      }
+    } catch (error: any) {
+      toast({
+        title: "Login Failed",
+        description: error.message || "Invalid email or password",
         variant: "destructive"
       });
     }
-
-    setIsLoading(false);
   };
 
-  // Mock signup
+  // Signup
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
 
     // Validate passwords match
     if (signupPassword !== signupConfirmPassword) {
@@ -151,39 +162,114 @@ export default function Auth({ portalType }: AuthPageProps) {
         description: "Passwords do not match",
         variant: "destructive"
       });
-      setIsLoading(false);
       return;
     }
 
-    // Simulate signup delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    if (signupName && signupEmail && signupPassword) {
+    // Validate password strength
+    if (signupPassword.length < 8) {
       toast({
-        title: "Account Created",
-        description: "Welcome to PriveScreen!",
+        title: "Signup Failed",
+        description: "Password must be at least 8 characters",
+        variant: "destructive"
       });
+      return;
+    }
 
-      localStorage.setItem("authUser", JSON.stringify({
-        id: "user-" + Math.random().toString(36).substr(2, 9),
-        email: signupEmail,
-        name: signupName,
-        phone: signupPhone,
-        role: portalType,
-        provider: "email"
-      }));
-
-      setLocation(config.redirectPath);
-    } else {
+    if (!signupFirstName || !signupLastName || !signupEmail || !signupPassword) {
       toast({
         title: "Signup Failed",
         description: "Please fill in all required fields",
         variant: "destructive"
       });
+      return;
     }
 
-    setIsLoading(false);
+    try {
+      const response = await registerMutation.mutateAsync({
+        email: signupEmail,
+        password: signupPassword,
+        firstName: signupFirstName,
+        lastName: signupLastName,
+        phone: signupPhone || undefined,
+        role: portalType,
+      });
+
+      if (response.success && response.data) {
+        // Show verification pending state instead of redirecting
+        setPendingVerificationEmail(response.data.email);
+        setShowVerificationPending(true);
+        toast({
+          title: "Account Created",
+          description: "Please check your email to verify your account.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Signup Failed",
+        description: error.message || "Could not create account. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
+
+  // Resend verification email
+  const handleResendVerification = async () => {
+    if (!pendingVerificationEmail) return;
+
+    setResendingVerification(true);
+    try {
+      const response = await resendVerificationEmail(pendingVerificationEmail);
+      if (response.success) {
+        toast({
+          title: "Email Sent",
+          description: "A new verification link has been sent to your email.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Failed to Resend",
+        description: error.message || "Could not resend verification email.",
+        variant: "destructive"
+      });
+    } finally {
+      setResendingVerification(false);
+    }
+  };
+
+  // Forgot password handler
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotPasswordEmail) {
+      toast({
+        title: "Email Required",
+        description: "Please enter your email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setSendingResetEmail(true);
+    try {
+      const response = await forgotPassword(forgotPasswordEmail);
+      if (response.success) {
+        setForgotPasswordSent(true);
+        toast({
+          title: "Email Sent",
+          description: "If an account exists, you will receive a reset link.",
+        });
+      }
+    } catch (error: any) {
+      toast({
+        title: "Request Failed",
+        description: error.message || "Could not send reset email.",
+        variant: "destructive"
+      });
+    } finally {
+      setSendingResetEmail(false);
+    }
+  };
+
+  const isLoading = loginMutation.isPending || registerMutation.isPending;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
@@ -207,6 +293,121 @@ export default function Auth({ portalType }: AuthPageProps) {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-12">
         <div className="max-w-md mx-auto">
+          {/* Forgot Password State */}
+          {showForgotPassword ? (
+            <Card className="shadow-lg">
+              <CardContent className="pt-8 pb-8 space-y-6">
+                {forgotPasswordSent ? (
+                  <div className="text-center space-y-6">
+                    <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                      <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                    </div>
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-bold">Check Your Email</h2>
+                      <p className="text-muted-foreground">
+                        If an account exists for <span className="font-medium text-primary">{forgotPasswordEmail}</span>,
+                        you will receive a password reset link.
+                      </p>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      The link will expire in 1 hour.
+                    </p>
+                    <Button
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => {
+                        setShowForgotPassword(false);
+                        setForgotPasswordSent(false);
+                        setForgotPasswordEmail("");
+                      }}
+                    >
+                      Back to Login
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="text-center space-y-2">
+                      <h2 className="text-2xl font-bold">Forgot Password?</h2>
+                      <p className="text-muted-foreground">
+                        Enter your email address and we'll send you a link to reset your password.
+                      </p>
+                    </div>
+                    <form onSubmit={handleForgotPassword} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="forgot-email">Email</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="forgot-email"
+                            type="email"
+                            placeholder="you@example.com"
+                            className="pl-10"
+                            value={forgotPasswordEmail}
+                            onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <Button type="submit" className="w-full" disabled={sendingResetEmail}>
+                        {sendingResetEmail ? "Sending..." : "Send Reset Link"}
+                      </Button>
+                    </form>
+                    <Button
+                      variant="ghost"
+                      className="w-full"
+                      onClick={() => setShowForgotPassword(false)}
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to Login
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          ) : showVerificationPending ? (
+            <Card className="shadow-lg">
+              <CardContent className="pt-8 pb-8 text-center space-y-6">
+                <div className="mx-auto w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
+                  <CheckCircle className="h-8 w-8 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="space-y-2">
+                  <h2 className="text-2xl font-bold">Check Your Email</h2>
+                  <p className="text-muted-foreground">
+                    We've sent a verification link to
+                  </p>
+                  <p className="font-medium text-primary">{pendingVerificationEmail}</p>
+                </div>
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Click the link in the email to verify your account and start using PriveScreen.
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    The link will expire in 24 hours.
+                  </p>
+                </div>
+                <div className="pt-4 space-y-3">
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={handleResendVerification}
+                    disabled={resendingVerification}
+                  >
+                    {resendingVerification ? "Sending..." : "Resend Verification Email"}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => {
+                      setShowVerificationPending(false);
+                      setActiveTab("login");
+                    }}
+                  >
+                    Back to Login
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
           <Card className="shadow-lg">
             <CardHeader className="text-center pb-2">
               <CardTitle className={`text-2xl ${config.color}`}>
@@ -316,13 +517,21 @@ export default function Auth({ portalType }: AuthPageProps) {
                     </div>
 
                     <div className="flex items-center justify-end">
-                      <Button variant="link" className="px-0 text-sm">
+                      <Button
+                        variant="link"
+                        className="px-0 text-sm"
+                        type="button"
+                        onClick={() => {
+                          setForgotPasswordEmail(loginEmail);
+                          setShowForgotPassword(true);
+                        }}
+                      >
                         Forgot password?
                       </Button>
                     </div>
 
                     <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? "Signing in..." : "Sign In"}
+                      {loginMutation.isPending ? "Signing in..." : "Sign In"}
                     </Button>
                   </form>
                 </TabsContent>
@@ -330,17 +539,30 @@ export default function Auth({ portalType }: AuthPageProps) {
                 {/* Signup Form */}
                 <TabsContent value="signup" className="space-y-4 mt-4">
                   <form onSubmit={handleSignup} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="signup-name">Full Name</Label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-firstname">First Name</Label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="signup-firstname"
+                            type="text"
+                            placeholder="Adebayo"
+                            className="pl-10"
+                            value={signupFirstName}
+                            onChange={(e) => setSignupFirstName(e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="signup-lastname">Last Name</Label>
                         <Input
-                          id="signup-name"
+                          id="signup-lastname"
                           type="text"
-                          placeholder="Adebayo Okonkwo"
-                          className="pl-10"
-                          value={signupName}
-                          onChange={(e) => setSignupName(e.target.value)}
+                          placeholder="Okonkwo"
+                          value={signupLastName}
+                          onChange={(e) => setSignupLastName(e.target.value)}
                           required
                         />
                       </div>
@@ -363,7 +585,7 @@ export default function Auth({ portalType }: AuthPageProps) {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="signup-phone">Phone Number</Label>
+                      <Label htmlFor="signup-phone">Phone Number (Optional)</Label>
                       <div className="relative">
                         <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -384,11 +606,12 @@ export default function Auth({ portalType }: AuthPageProps) {
                         <Input
                           id="signup-password"
                           type="password"
-                          placeholder="Create a password"
+                          placeholder="Create a password (min 8 chars)"
                           className="pl-10"
                           value={signupPassword}
                           onChange={(e) => setSignupPassword(e.target.value)}
                           required
+                          minLength={8}
                         />
                       </div>
                     </div>
@@ -410,7 +633,7 @@ export default function Auth({ portalType }: AuthPageProps) {
                     </div>
 
                     <Button type="submit" className="w-full" disabled={isLoading}>
-                      {isLoading ? "Creating account..." : "Create Account"}
+                      {registerMutation.isPending ? "Creating account..." : "Create Account"}
                     </Button>
 
                     <p className="text-xs text-center text-muted-foreground">
@@ -424,8 +647,10 @@ export default function Auth({ portalType }: AuthPageProps) {
               </Tabs>
             </CardContent>
           </Card>
+          )}
 
-          {/* Portal switcher */}
+          {/* Portal switcher - hide when verification pending */}
+          {!showVerificationPending && (
           <div className="mt-6 text-center text-sm text-muted-foreground">
             <p>Looking for a different portal?</p>
             <div className="flex gap-4 justify-center mt-2">
@@ -440,9 +665,10 @@ export default function Auth({ portalType }: AuthPageProps) {
               )}
             </div>
           </div>
+          )}
 
-          {/* Center Onboarding CTA - only show for center portal */}
-          {portalType === "center" && (
+          {/* Center Onboarding CTA - only show for center portal and not when verification pending */}
+          {portalType === "center" && !showVerificationPending && (
             <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 rounded-lg border border-green-200 dark:border-green-800">
               <div className="flex items-center gap-3 mb-3">
                 <Building2 className="h-6 w-6 text-green-600" />

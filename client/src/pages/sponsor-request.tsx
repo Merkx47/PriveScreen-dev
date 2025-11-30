@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,50 +24,115 @@ import { PriveScreenLogo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
 import {
-  getSponsorTestByCode,
-  mockDiagnosticCenters,
-  mockTestStandards,
-  type SponsorTestRequest,
-} from "@/lib/mock-data";
+  getPatientSponsorRequest,
+  respondToPatientSponsorRequest,
+  type PatientSponsorRequest,
+} from "@/lib/api/sponsors";
 
 export default function SponsorRequest() {
   const { toast } = useToast();
   const [, params] = useRoute("/sponsor-request/:code");
   const code = params?.code || "";
 
+  const [isLoading, setIsLoading] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [response, setResponse] = useState<'accepted' | 'declined' | null>(null);
+  const [request, setRequest] = useState<PatientSponsorRequest | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get the sponsor test request
-  const request = getSponsorTestByCode(code);
+  // Fetch the sponsor test request
+  useEffect(() => {
+    const fetchRequest = async () => {
+      if (!code) {
+        setIsLoading(false);
+        return;
+      }
 
-  // Get center and test info
-  const center = request ? mockDiagnosticCenters.find(c => c.id === request.centerId) : null;
-  const testPackage = request ? mockTestStandards.find(t => t.id === request.testPackageId) : null;
+      setIsLoading(true);
+      try {
+        const result = await getPatientSponsorRequest(code);
+        if (result.success && result.data) {
+          setRequest(result.data);
+        } else {
+          setError(result.error || "Request not found");
+        }
+      } catch (err) {
+        setError("Unable to load request. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRequest();
+  }, [code]);
 
   const handleAccept = async () => {
     setIsProcessing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    setIsProcessing(false);
-    setResponse('accepted');
-    toast({
-      title: "Request Accepted!",
-      description: "You have agreed to sponsor this health test. The patient will be notified.",
-    });
+    try {
+      const result = await respondToPatientSponsorRequest(code, 'accept');
+      if (result.success) {
+        setResponse('accepted');
+        toast({
+          title: "Request Accepted!",
+          description: "You have agreed to sponsor this health test. The patient will be notified.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to accept request",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Unable to process your response. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleDecline = async () => {
     setIsProcessing(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setIsProcessing(false);
-    setResponse('declined');
-    toast({
-      title: "Request Declined",
-      description: "The patient will be notified of your decision.",
-    });
+    try {
+      const result = await respondToPatientSponsorRequest(code, 'decline');
+      if (result.success) {
+        setResponse('declined');
+        toast({
+          title: "Request Declined",
+          description: "The patient will be notified of your decision.",
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to decline request",
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: "Unable to process your response. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading request...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Not found state
   if (!request) {
@@ -90,7 +155,7 @@ export default function SponsorRequest() {
   }
 
   // Expired state
-  if (request.status === 'expired' || new Date() > request.expiresAt) {
+  if (request.status === 'expired' || new Date() > new Date(request.expiresAt)) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
@@ -178,16 +243,16 @@ export default function SponsorRequest() {
                 <div className="flex items-start gap-3">
                   <Building2 className="h-5 w-5 text-primary mt-0.5" />
                   <div>
-                    <p className="font-medium">{center?.name}</p>
-                    <p className="text-sm text-muted-foreground">{center?.location}</p>
+                    <p className="font-medium">{request.centerName}</p>
+                    <p className="text-sm text-muted-foreground">{request.centerLocation}</p>
                   </div>
                 </div>
               </div>
 
               <div className="p-4 border rounded-lg">
                 <p className="text-sm text-muted-foreground mb-1">Test Package</p>
-                <p className="font-medium">{testPackage?.name}</p>
-                <p className="text-xs text-muted-foreground mt-1">{testPackage?.description}</p>
+                <p className="font-medium">{request.testPackageName}</p>
+                <p className="text-xs text-muted-foreground mt-1">{request.testPackageDescription}</p>
               </div>
 
               <div className="p-4 border rounded-lg bg-primary/5">
@@ -280,8 +345,8 @@ export default function SponsorRequest() {
               <Building2 className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Diagnostic Center</p>
-                <p className="font-medium">{center?.name}</p>
-                <p className="text-sm text-muted-foreground">{center?.location}</p>
+                <p className="font-medium">{request.centerName}</p>
+                <p className="text-sm text-muted-foreground">{request.centerLocation}</p>
               </div>
             </div>
 
@@ -291,8 +356,8 @@ export default function SponsorRequest() {
               <HandCoins className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Test Package</p>
-                <p className="font-medium">{testPackage?.name}</p>
-                <p className="text-sm text-muted-foreground">{testPackage?.description}</p>
+                <p className="font-medium">{request.testPackageName}</p>
+                <p className="text-sm text-muted-foreground">{request.testPackageDescription}</p>
               </div>
             </div>
 
@@ -315,7 +380,7 @@ export default function SponsorRequest() {
               <Calendar className="h-5 w-5 text-muted-foreground mt-0.5" />
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Request Expires</p>
-                <p className="font-medium">{request.expiresAt.toLocaleDateString()}</p>
+                <p className="font-medium">{new Date(request.expiresAt).toLocaleDateString()}</p>
                 <p className="text-xs text-muted-foreground">
                   Accept before this date to sponsor the test
                 </p>

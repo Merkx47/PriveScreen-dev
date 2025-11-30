@@ -5,17 +5,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Loader2, Info, Home, Building2, Clock, AlertCircle, Plus, Minus, MapPin, Star, ArrowLeft, Phone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { isUnauthorizedError } from "@/lib/authUtils";
-import type { TestStandard, DiagnosticCenter } from "@shared/schema";
 import { Skeleton } from "@/components/ui/skeleton";
-import { mockTestStandards, sexualWellnessAddOns, mockDiagnosticCenters, getCenterTestPrice } from "@/lib/mock-data";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { useDiagnosticCenters, useTestStandards, useOrderTest } from "@/lib/api/hooks";
 
 interface OrderTestDialogProps {
   open: boolean;
@@ -25,6 +21,13 @@ interface OrderTestDialogProps {
 type TestingMode = "center" | "at-home";
 type Step = "select-center" | "select-test";
 
+// Wellness add-ons (can be fetched from API in future)
+const sexualWellnessAddOns = [
+  { id: "psa", name: "PSA Test", description: "Prostate health screening for men", price: "8500", turnaroundTime: "24-48 hours" },
+  { id: "hormone", name: "Hormone Panel", description: "Testosterone/Estrogen levels", price: "15000", turnaroundTime: "48-72 hours" },
+  { id: "fertility", name: "Basic Fertility Screen", description: "Sperm count or AMH test", price: "12000", turnaroundTime: "48-72 hours" },
+];
+
 export function OrderTestDialog({ open, onOpenChange }: OrderTestDialogProps) {
   const { toast } = useToast();
   const [step, setStep] = useState<Step>("select-center");
@@ -33,15 +36,20 @@ export function OrderTestDialog({ open, onOpenChange }: OrderTestDialogProps) {
   const [testingMode, setTestingMode] = useState<TestingMode>("center");
   const [selectedAddOns, setSelectedAddOns] = useState<string[]>([]);
   const [showWindowPeriodInfo, setShowWindowPeriodInfo] = useState(false);
-  const tests = mockTestStandards;
-  const centers = mockDiagnosticCenters;
-  const isLoading = false;
+
+  // API hooks
+  const { data: centersData, isLoading: centersLoading } = useDiagnosticCenters(0, 50);
+  const { data: testsData, isLoading: testsLoading } = useTestStandards(0, 50);
+  const orderMutation = useOrderTest();
+
+  const centers = centersData?.content || [];
+  const tests = testsData?.content || [];
+  const isLoading = centersLoading || testsLoading;
 
   // Get center-specific price for a test
   const getTestPrice = (testStandardId: string): string => {
-    if (!selectedCenter) return "0";
-    const centerPrice = getCenterTestPrice(selectedCenter, testStandardId);
-    return centerPrice || tests.find(t => t.id === testStandardId)?.price || "0";
+    const test = tests.find(t => t.id === testStandardId);
+    return test?.price || "0";
   };
 
   // Calculate total price
@@ -63,21 +71,6 @@ export function OrderTestDialog({ open, onOpenChange }: OrderTestDialogProps) {
     );
   };
 
-  const orderMutation = {
-    mutate: (testStandardId: string) => {
-      const test = tests.find(t => t.id === testStandardId);
-      const center = centers.find(c => c.id === selectedCenter);
-      const modeLabel = testingMode === "at-home" ? "At-Home Service" : center?.name;
-      toast({
-        title: "Test Ordered",
-        description: `Assessment code generated for ${test?.name} at ${modeLabel}`,
-      });
-      onOpenChange(false);
-      resetForm();
-    },
-    isPending: false,
-  };
-
   const resetForm = () => {
     setStep("select-center");
     setSelectedCenter(null);
@@ -87,8 +80,30 @@ export function OrderTestDialog({ open, onOpenChange }: OrderTestDialogProps) {
   };
 
   const handleOrder = () => {
-    if (selectedTest) {
-      orderMutation.mutate(selectedTest);
+    if (selectedTest && selectedCenter) {
+      orderMutation.mutate(
+        { testStandardId: selectedTest, centerId: selectedCenter, addOns: selectedAddOns },
+        {
+          onSuccess: (data) => {
+            const test = tests.find(t => t.id === selectedTest);
+            const center = centers.find(c => c.id === selectedCenter);
+            const modeLabel = testingMode === "at-home" ? "At-Home Service" : center?.name;
+            toast({
+              title: "Test Ordered",
+              description: `Assessment code generated for ${test?.name} at ${modeLabel}`,
+            });
+            onOpenChange(false);
+            resetForm();
+          },
+          onError: (error: any) => {
+            toast({
+              title: "Order Failed",
+              description: error.message || "Failed to order test. Please try again.",
+              variant: "destructive",
+            });
+          }
+        }
+      );
     }
   };
 
@@ -182,49 +197,60 @@ export function OrderTestDialog({ open, onOpenChange }: OrderTestDialogProps) {
               <Label className="text-base font-semibold">
                 {testingMode === "at-home" ? "Select Center for Sample Processing" : "Select Diagnostic Center"}
               </Label>
-              <div className="space-y-3">
-                {centers.map((center) => (
-                  <Card
-                    key={center.id}
-                    className="cursor-pointer transition-all hover-elevate hover:border-primary/50"
-                    onClick={() => handleCenterSelect(center.id)}
-                    data-testid={`card-center-${center.id}`}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3 className="font-semibold">{center.name}</h3>
-                            {center.verified && (
-                              <Badge variant="secondary" className="text-xs">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
-                                Verified
-                              </Badge>
-                            )}
+              {centers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Building2 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No diagnostic centers available</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {centers.map((center) => (
+                    <Card
+                      key={center.id}
+                      className="cursor-pointer transition-all hover-elevate hover:border-primary/50"
+                      onClick={() => handleCenterSelect(center.id)}
+                      data-testid={`card-center-${center.id}`}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold">{center.name}</h3>
+                              {center.verified && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                                  Verified
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
+                              <MapPin className="h-3.5 w-3.5" />
+                              <span>{center.address}, {center.city}</span>
+                            </div>
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              {center.rating && (
+                                <span className="flex items-center gap-1">
+                                  <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                                  {center.rating}
+                                </span>
+                              )}
+                              {center.operatingHours && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  {center.operatingHours}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1 text-sm text-muted-foreground mb-2">
-                            <MapPin className="h-3.5 w-3.5" />
-                            <span>{center.address}, {center.city}</span>
-                          </div>
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-                              {center.rating}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3.5 w-3.5" />
-                              {center.hours}
-                            </span>
-                          </div>
+                          <Button variant="outline" size="sm">
+                            View Pricing
+                          </Button>
                         </div>
-                        <Button variant="outline" size="sm">
-                          View Pricing
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -248,82 +274,58 @@ export function OrderTestDialog({ open, onOpenChange }: OrderTestDialogProps) {
             {/* Test Selection */}
             <div className="space-y-3">
               <Label className="text-base font-semibold">Select Test Type</Label>
-              {tests.map((test) => {
-                const hasWindowInfo = (test as any).hasWindowPeriodInfo;
-                const windowDays = (test as any).windowPeriodDays;
-                const isDefault = (test as any).isDefault;
-                const centerPrice = getTestPrice(test.id);
+              {tests.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p>No tests available</p>
+                </div>
+              ) : (
+                tests.map((test) => {
+                  const centerPrice = getTestPrice(test.id);
 
-                return (
-                  <Card
-                    key={test.id}
-                    className={`cursor-pointer transition-all hover-elevate ${
-                      selectedTest === test.id ? 'ring-2 ring-primary' : ''
-                    } ${isDefault ? 'border-primary/50' : ''}`}
-                    onClick={() => setSelectedTest(test.id)}
-                    data-testid={`card-test-${test.id}`}
-                  >
-                    <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <CardTitle className="text-lg">{test.name}</CardTitle>
-                          {isDefault && (
-                            <Badge variant="default" className="text-xs">Recommended</Badge>
-                          )}
-                          {hasWindowInfo && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setShowWindowPeriodInfo(!showWindowPeriodInfo);
-                                    }}
-                                    className="inline-flex items-center justify-center"
-                                  >
-                                    <Info className="h-4 w-4 text-amber-500" />
-                                  </button>
-                                </TooltipTrigger>
-                                <TooltipContent side="top" className="max-w-xs">
-                                  <p className="font-semibold mb-1">HIV Window Period Info</p>
-                                  <p className="text-sm">
-                                    This test can detect HIV as early as {windowDays} days after exposure.
-                                    Standard antibody tests may take up to 90 days to detect infection.
-                                    If you've had recent exposure, this test provides earlier detection.
-                                  </p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
+                  return (
+                    <Card
+                      key={test.id}
+                      className={`cursor-pointer transition-all hover-elevate ${
+                        selectedTest === test.id ? 'ring-2 ring-primary' : ''
+                      }`}
+                      onClick={() => setSelectedTest(test.id)}
+                      data-testid={`card-test-${test.id}`}
+                    >
+                      <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0 pb-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <CardTitle className="text-lg">{test.name}</CardTitle>
+                          </div>
+                          <CardDescription className="mt-1">{test.description}</CardDescription>
+                        </div>
+                        <Badge variant="secondary" className="text-lg font-semibold whitespace-nowrap">
+                          ₦{parseFloat(centerPrice).toLocaleString()}
+                        </Badge>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium">What's Included:</p>
+                          <ul className="grid grid-cols-2 gap-2">
+                            {test.testsIncluded.map((item, idx) => (
+                              <li key={idx} className="flex gap-2 text-sm">
+                                <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                                <span>{item}</span>
+                              </li>
+                            ))}
+                          </ul>
+                          {test.turnaroundTime && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3">
+                              <Clock className="h-4 w-4" />
+                              <span>Results in: {test.turnaroundTime}</span>
+                            </div>
                           )}
                         </div>
-                        <CardDescription className="mt-1">{test.description}</CardDescription>
-                      </div>
-                      <Badge variant="secondary" className="text-lg font-semibold whitespace-nowrap">
-                        ₦{parseFloat(centerPrice).toLocaleString()}
-                      </Badge>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">What's Included:</p>
-                        <ul className="grid grid-cols-2 gap-2">
-                          {test.testsIncluded.map((item, idx) => (
-                            <li key={idx} className="flex gap-2 text-sm">
-                              <CheckCircle2 className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
-                              <span>{item}</span>
-                            </li>
-                          ))}
-                        </ul>
-                        {test.turnaroundTime && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-3">
-                            <Clock className="h-4 w-4" />
-                            <span>Results in: {test.turnaroundTime}</span>
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
             </div>
 
             <Separator />

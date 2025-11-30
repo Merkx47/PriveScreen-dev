@@ -2,21 +2,29 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, FileText, CheckCircle2, Clock, XCircle, Home, MapPin, Calendar, Crown, Building2 } from "lucide-react";
+import { ArrowLeft, FileText, CheckCircle2, Clock, XCircle, Home, MapPin, Calendar, Crown, Building2, Loader2 } from "lucide-react";
 import { AssessmentCodeCard } from "@/components/assessment-code-card";
 import { PriveScreenLogo } from "@/components/logo";
 import { TestResultCard } from "@/components/test-result-card";
-import { mockAssessmentCodes, mockTestResults, mockTransactions, mockHomeServiceBookings, mockDiagnosticCenters, mockTestStandards } from "@/lib/mock-data";
 import { format } from "date-fns";
+import {
+  useMyActiveCodes,
+  useMyResults,
+  useTransactions,
+  useHomeServiceBookings
+} from "@/lib/api/hooks";
 
 export default function History() {
-  const codes = mockAssessmentCodes;
-  const results = mockTestResults;
-  const transactions = mockTransactions;
-  const bookings = mockHomeServiceBookings;
+  // API hooks
+  const { data: codesData, isLoading: codesLoading } = useMyActiveCodes();
+  const { data: resultsData, isLoading: resultsLoading } = useMyResults(0, 50);
+  const { data: transactionsData, isLoading: transactionsLoading } = useTransactions(0, 50);
+  const { data: bookingsData, isLoading: bookingsLoading } = useHomeServiceBookings();
 
-  const getBookingCenter = (centerId: string) => mockDiagnosticCenters.find(c => c.id === centerId);
-  const getBookingTest = (testId: string) => mockTestStandards.find(t => t.id === testId);
+  const codes = codesData || [];
+  const results = resultsData?.content || [];
+  const transactions = transactionsData?.content || [];
+  const bookings = bookingsData?.content || [];
 
   const getBookingStatusColor = (status: string) => {
     switch (status) {
@@ -83,7 +91,11 @@ export default function History() {
               <h2 className="text-xl font-semibold">Test Results</h2>
               <p className="text-sm text-muted-foreground">{results.length} total</p>
             </div>
-            {results.length === 0 ? (
+            {resultsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : results.length === 0 ? (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   <PriveScreenLogo size={48} className="mx-auto mb-3 opacity-50" />
@@ -108,7 +120,11 @@ export default function History() {
               </h2>
               <p className="text-sm text-muted-foreground">{bookings.length} total</p>
             </div>
-            {bookings.length === 0 ? (
+            {bookingsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : bookings.length === 0 ? (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   <Home className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -124,10 +140,8 @@ export default function History() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {bookings.map((booking) => {
-                  const center = getBookingCenter(booking.centerId);
-                  const test = getBookingTest(booking.testStandardId);
-                  const isUpcoming = booking.scheduledDate > new Date();
+                {bookings.map((booking: any) => {
+                  const isUpcoming = new Date(booking.scheduledDate) > new Date();
 
                   return (
                     <Card key={booking.id} className={isUpcoming ? "border-amber-200 dark:border-amber-800" : ""} data-testid={`card-booking-${booking.id}`}>
@@ -138,7 +152,7 @@ export default function History() {
                               <Home className="h-4 w-4 text-amber-600" />
                             </div>
                             <div>
-                              <h3 className="font-semibold">{test?.name || 'Test'}</h3>
+                              <h3 className="font-semibold">{booking.testName || 'Test'}</h3>
                               <p className="text-sm text-muted-foreground">Home Sample Collection</p>
                             </div>
                           </div>
@@ -152,12 +166,12 @@ export default function History() {
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <Calendar className="h-3.5 w-3.5" />
                               <span>
-                                {format(booking.scheduledDate, 'EEEE, MMMM d, yyyy')} at {booking.scheduledTime}
+                                {format(new Date(booking.scheduledDate), 'EEEE, MMMM d, yyyy')} at {booking.scheduledTime}
                               </span>
                             </div>
                             <div className="flex items-center gap-2 text-muted-foreground">
                               <Building2 className="h-3.5 w-3.5" />
-                              <span>{center?.name || 'Center'}</span>
+                              <span>{booking.centerName || 'Center'}</span>
                             </div>
                           </div>
                           <div className="space-y-2">
@@ -170,10 +184,10 @@ export default function History() {
 
                         <div className="mt-3 pt-3 border-t flex items-center justify-between">
                           <div className="text-sm text-muted-foreground">
-                            Booked: {format(booking.createdAt, 'PP')}
+                            Booked: {format(new Date(booking.createdAt), 'PP')}
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="font-semibold">₦{parseFloat(booking.price).toLocaleString()}</span>
+                            <span className="font-semibold">₦{parseFloat(booking.price || '0').toLocaleString()}</span>
                             {booking.status === 'completed' && booking.resultId && (
                               <Button size="sm" variant="outline" asChild>
                                 <a href={`/results/${booking.resultId}`}>
@@ -201,7 +215,11 @@ export default function History() {
               <h2 className="text-xl font-semibold">Assessment Codes</h2>
               <p className="text-sm text-muted-foreground">{codes.length} total</p>
             </div>
-            {codes.length === 0 ? (
+            {codesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : codes.length === 0 ? (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -211,7 +229,7 @@ export default function History() {
               </Card>
             ) : (
               <div className="space-y-4">
-                {codes.map((code) => (
+                {codes.map((code: any) => (
                   <AssessmentCodeCard key={code.id} code={code} />
                 ))}
               </div>
@@ -223,7 +241,11 @@ export default function History() {
               <h2 className="text-xl font-semibold">Transaction History</h2>
               <p className="text-sm text-muted-foreground">{transactions.length} total</p>
             </div>
-            {transactions.length === 0 ? (
+            {transactionsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : transactions.length === 0 ? (
               <Card>
                 <CardContent className="pt-6 text-center text-muted-foreground">
                   <FileText className="h-12 w-12 mx-auto mb-3 opacity-50" />
@@ -233,7 +255,7 @@ export default function History() {
               </Card>
             ) : (
               <div className="space-y-3">
-                {transactions.map((txn) => (
+                {transactions.map((txn: any) => (
                   <Card key={txn.id} data-testid={`card-transaction-${txn.id}`}>
                     <CardContent className="pt-4">
                       <div className="flex items-center justify-between">

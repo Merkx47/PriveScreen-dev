@@ -1,5 +1,5 @@
 import * as React from "react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Send,
   Shield,
@@ -29,9 +30,23 @@ import {
   Plus,
   Minus,
   X,
+  Loader2,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { mockDiagnosticCenters, mockCenterPrices, type DiagnosticCenter, type CenterPackage } from "@/lib/mock-data";
+import {
+  getCenters,
+  getCenterPricing,
+  type DiagnosticCenter,
+  type CenterPricing,
+} from "@/lib/api/centers";
+
+// Type for center packages derived from pricing
+type CenterPackage = {
+  id: string;
+  name: string;
+  description: string;
+  price: string;
+};
 
 interface RequestSponsorDialogProps {
   open: boolean;
@@ -62,14 +77,79 @@ export function RequestSponsorDialog({ open, onOpenChange }: RequestSponsorDialo
   const [generatedCode, setGeneratedCode] = useState("");
   const [shareLink, setShareLink] = useState("");
 
-  // Get test packages for the selected center
-  const getCenterPackages = () => {
-    if (!selectedCenter) return [];
-    const centerPrices = mockCenterPrices.find(cp => cp.centerId === selectedCenter.id);
-    return centerPrices?.packages || [];
-  };
+  // API data states
+  const [centers, setCenters] = useState<DiagnosticCenter[]>([]);
+  const [isLoadingCenters, setIsLoadingCenters] = useState(false);
+  const [centerPackages, setCenterPackages] = useState<CenterPackage[]>([]);
+  const [isLoadingPricing, setIsLoadingPricing] = useState(false);
+  const [centerTestCounts, setCenterTestCounts] = useState<Record<string, number>>({});
 
-  const centerPackages = getCenterPackages();
+  // Load centers on dialog open
+  useEffect(() => {
+    if (open && centers.length === 0) {
+      const fetchCenters = async () => {
+        setIsLoadingCenters(true);
+        try {
+          const response = await getCenters(0, 50);
+          if (response.success && response.data) {
+            const verifiedCenters = response.data.content.filter(c => c.verified);
+            setCenters(verifiedCenters);
+            // Fetch pricing counts for all centers
+            const counts: Record<string, number> = {};
+            await Promise.all(verifiedCenters.map(async (center) => {
+              const pricingResponse = await getCenterPricing(center.id);
+              if (pricingResponse.success && pricingResponse.data) {
+                counts[center.id] = pricingResponse.data.length;
+              } else {
+                counts[center.id] = 0;
+              }
+            }));
+            setCenterTestCounts(counts);
+          }
+        } catch (err) {
+          toast({
+            title: "Error",
+            description: "Failed to load diagnostic centers",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingCenters(false);
+        }
+      };
+      fetchCenters();
+    }
+  }, [open, centers.length, toast]);
+
+  // Load pricing when center is selected
+  useEffect(() => {
+    if (selectedCenter) {
+      const fetchPricing = async () => {
+        setIsLoadingPricing(true);
+        setCenterPackages([]);
+        try {
+          const response = await getCenterPricing(selectedCenter.id);
+          if (response.success && response.data) {
+            const packages: CenterPackage[] = response.data.map((p: CenterPricing) => ({
+              id: p.testId,
+              name: p.testName,
+              description: `Test at ${selectedCenter.name}`,
+              price: p.price,
+            }));
+            setCenterPackages(packages);
+          }
+        } catch (err) {
+          toast({
+            title: "Error",
+            description: "Failed to load test pricing",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingPricing(false);
+        }
+      };
+      fetchPricing();
+    }
+  }, [selectedCenter, toast]);
 
   // Calculate total price of selected tests
   const totalPrice = useMemo(() => {
@@ -80,8 +160,7 @@ export function RequestSponsorDialog({ open, onOpenChange }: RequestSponsorDialo
 
   // Get available tests count per center
   const getCenterTestCount = (centerId: string) => {
-    const centerPrices = mockCenterPrices.find(cp => cp.centerId === centerId);
-    return centerPrices?.packages.length || 0;
+    return centerTestCounts[centerId] || 0;
   };
 
   // Add or update a test selection
@@ -240,74 +319,99 @@ export function RequestSponsorDialog({ open, onOpenChange }: RequestSponsorDialo
 
             <div className="space-y-3">
               <Label>Select Diagnostic Center</Label>
-              {mockDiagnosticCenters.filter(c => c.verified).map((center) => {
-                const testCount = getCenterTestCount(center.id);
-                return (
-                  <Card
-                    key={center.id}
-                    className={`cursor-pointer transition-all hover:border-primary/50 ${
-                      selectedCenter?.id === center.id ? 'border-primary bg-primary/5' : ''
-                    }`}
-                    onClick={() => handleSelectCenter(center)}
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{center.name}</span>
-                            {selectedCenter?.id === center.id && (
-                              <CheckCircle2 className="h-4 w-4 text-primary" />
+              {isLoadingCenters ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Card key={i}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-48" />
+                            <Skeleton className="h-3 w-32" />
+                          </div>
+                          <Skeleton className="h-8 w-8 rounded-full" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : centers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Building2 className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No verified centers available</p>
+                </div>
+              ) : (
+                centers.map((center) => {
+                  const testCount = getCenterTestCount(center.id);
+                  return (
+                    <Card
+                      key={center.id}
+                      className={`cursor-pointer transition-all hover:border-primary/50 ${
+                        selectedCenter?.id === center.id ? 'border-primary bg-primary/5' : ''
+                      }`}
+                      onClick={() => handleSelectCenter(center)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">{center.name}</span>
+                              {selectedCenter?.id === center.id && (
+                                <CheckCircle2 className="h-4 w-4 text-primary" />
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
+                              <MapPin className="h-3 w-3" />
+                              <span>{center.address}, {center.city}</span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            {center.rating && (
+                              <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                                <span className="text-sm font-medium">{center.rating}</span>
+                              </div>
                             )}
-                          </div>
-                          <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
-                            <MapPin className="h-3 w-3" />
-                            <span>{center.location}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-1">
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                            <span className="text-sm font-medium">{center.rating}</span>
-                          </div>
-                          {/* Available Tests Dial */}
-                          <div className="flex items-center gap-1.5">
-                            <div className="relative w-8 h-8">
-                              <svg className="w-8 h-8 transform -rotate-90">
-                                <circle
-                                  cx="16"
-                                  cy="16"
-                                  r="12"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="3"
-                                  className="text-muted/30"
-                                />
-                                <circle
-                                  cx="16"
-                                  cy="16"
-                                  r="12"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth="3"
-                                  strokeDasharray={`${(testCount / 6) * 75.4} 75.4`}
-                                  className="text-primary"
-                                />
-                              </svg>
-                              <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
-                                {testCount}
-                              </span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-xs text-muted-foreground">tests</span>
+                            {/* Available Tests Dial */}
+                            <div className="flex items-center gap-1.5">
+                              <div className="relative w-8 h-8">
+                                <svg className="w-8 h-8 transform -rotate-90">
+                                  <circle
+                                    cx="16"
+                                    cy="16"
+                                    r="12"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="3"
+                                    className="text-muted/30"
+                                  />
+                                  <circle
+                                    cx="16"
+                                    cy="16"
+                                    r="12"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="3"
+                                    strokeDasharray={`${(testCount / 6) * 75.4} 75.4`}
+                                    className="text-primary"
+                                  />
+                                </svg>
+                                <span className="absolute inset-0 flex items-center justify-center text-xs font-bold">
+                                  {testCount}
+                                </span>
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-xs text-muted-foreground">tests</span>
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              )}
             </div>
 
             {selectedCenter && (
@@ -322,10 +426,32 @@ export function RequestSponsorDialog({ open, onOpenChange }: RequestSponsorDialo
 
                 {/* Test selection cards */}
                 <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                  {centerPackages.map((pkg) => {
-                    const isSelected = isTestSelected(pkg.id);
-                    const selectedTest = selectedTests.find(t => t.package.id === pkg.id);
-                    return (
+                  {isLoadingPricing ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map((i) => (
+                        <Card key={i}>
+                          <CardContent className="p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-40" />
+                                <Skeleton className="h-3 w-24" />
+                              </div>
+                              <Skeleton className="h-5 w-16" />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : centerPackages.length === 0 ? (
+                    <div className="text-center py-4 text-muted-foreground">
+                      <TestTube className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No tests available at this center</p>
+                    </div>
+                  ) : (
+                    centerPackages.map((pkg) => {
+                      const isSelected = isTestSelected(pkg.id);
+                      const selectedTest = selectedTests.find(t => t.package.id === pkg.id);
+                      return (
                       <Card
                         key={pkg.id}
                         className={`cursor-pointer transition-all ${
@@ -386,7 +512,8 @@ export function RequestSponsorDialog({ open, onOpenChange }: RequestSponsorDialo
                         </CardContent>
                       </Card>
                     );
-                  })}
+                  })
+                  )}
                 </div>
 
                 {/* Selected tests summary */}
