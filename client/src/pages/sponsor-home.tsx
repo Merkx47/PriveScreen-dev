@@ -8,7 +8,6 @@ import {
   Users,
   CheckCircle2,
   Clock,
-  ArrowLeft,
   Lock,
   Eye,
   Wallet as WalletIcon,

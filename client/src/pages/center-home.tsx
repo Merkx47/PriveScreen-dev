@@ -11,7 +11,6 @@ import {
   Search,
   CheckCircle2,
   Upload,
-  ArrowLeft,
   Settings,
   Wallet,
   TrendingUp,
@@ -123,11 +122,6 @@ export default function CenterHome() {
               <ThemeToggle />
               <Button variant="ghost" size="icon" onClick={handleLogout} title="Logout">
                 <LogOut className="h-5 w-5" />
-              </Button>
-              <Button variant="ghost" size="icon" data-testid="button-back" asChild>
-                <a href="/">
-                  <ArrowLeft className="h-5 w-5" />
-                </a>
               </Button>
             </div>
           </div>
