@@ -129,20 +129,39 @@ export default function AdminDashboard() {
     setIsAuthenticated(false);
   }, []);
 
+  // Get current user's access level
+  const getCurrentUserAccessLevel = (): string => {
+    try {
+      const storedUser = localStorage.getItem("authUser");
+      if (storedUser) {
+        const user = JSON.parse(storedUser);
+        return user.adminAccessLevel || "read_only";
+      }
+    } catch {
+      // Invalid stored data
+    }
+    return "read_only";
+  };
+
   // Fetch dashboard data
   const fetchDashboardData = async () => {
     setIsLoading(true);
     setError(null);
+    const accessLevel = getCurrentUserAccessLevel();
+    const isSuperAdmin = accessLevel === "super_admin";
+
     try {
-      const [statsRes, usersRes, centersRes, sponsorsRes, logsRes, pendingCentersRes, adminsRes] = await Promise.all([
+      // Core data that all admins can access
+      const corePromises = [
         getDashboardStats(),
         getUsers("patient", 0, 20),
         getCenters(undefined, 0, 20),
         getSponsors(undefined, 0, 20),
-        getAuditLogs(undefined, undefined, 0, 20),
         getCenters("pending", 0, 10),
         getUsers("admin", 0, 20),
-      ]);
+      ];
+
+      const [statsRes, usersRes, centersRes, sponsorsRes, pendingCentersRes, adminsRes] = await Promise.all(corePromises);
 
       if (statsRes.success && statsRes.data) {
         setStats(statsRes.data as unknown as DashboardStats);
@@ -156,14 +175,28 @@ export default function AdminDashboard() {
       if (sponsorsRes.success && sponsorsRes.data) {
         setSponsors(sponsorsRes.data.content || []);
       }
-      if (logsRes.success && logsRes.data) {
-        setAuditLogs(logsRes.data.content || []);
-      }
       if (pendingCentersRes.success && pendingCentersRes.data) {
         setPendingCenters(pendingCentersRes.data.content || []);
       }
       if (adminsRes.success && adminsRes.data) {
         setAdminUsers(adminsRes.data.content || []);
+      }
+
+      // Audit logs - only fetch for super admins
+      if (isSuperAdmin) {
+        try {
+          const logsRes = await getAuditLogs(undefined, undefined, 0, 20);
+          if (logsRes.success && logsRes.data) {
+            setAuditLogs(logsRes.data.content || []);
+          }
+        } catch (logsErr) {
+          console.warn("Failed to fetch audit logs:", logsErr);
+          // Don't fail the whole dashboard, just skip audit logs
+          setAuditLogs([]);
+        }
+      } else {
+        // Non-super admins don't have access to audit logs
+        setAuditLogs([]);
       }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
@@ -354,15 +387,18 @@ export default function AdminDashboard() {
                 <h1 className="text-xl font-bold">PriveScreen Admin</h1>
                 <Badge variant="secondary" className="text-xs">
                   <Shield className="h-3 w-3 mr-1" />
-                  Super Admin
+                  {getCurrentUserAccessLevel() === "super_admin" ? "Super Admin" :
+                   getCurrentUserAccessLevel() === "editor" ? "Editor" : "Read Only"}
                 </Badge>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => setShowInviteAdmin(true)}>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Invite Admin
-              </Button>
+              {getCurrentUserAccessLevel() === "super_admin" && (
+                <Button variant="outline" size="sm" onClick={() => setShowInviteAdmin(true)}>
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Invite Admin
+                </Button>
+              )}
               <ThemeToggle />
               <Button variant="ghost" size="icon" onClick={() => setShowSettings(true)}>
                 <Settings className="h-5 w-5" />
@@ -1180,6 +1216,12 @@ export default function AdminDashboard() {
                         <Skeleton className="w-24 h-8" />
                       </div>
                     ))}
+                  </div>
+                ) : getCurrentUserAccessLevel() !== "super_admin" ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Shield className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <p className="font-medium">Access Restricted</p>
+                    <p className="text-sm mt-1">Audit logs are only available to Super Admins</p>
                   </div>
                 ) : auditLogs.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">

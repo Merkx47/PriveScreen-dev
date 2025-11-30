@@ -32,7 +32,8 @@ export default function AdminAuth() {
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // Signup form state
-  const [signupName, setSignupName] = useState("");
+  const [signupFirstName, setSignupFirstName] = useState("");
+  const [signupLastName, setSignupLastName] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
@@ -255,7 +256,7 @@ export default function AdminAuth() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!signupName || !signupEmail || !signupPassword || !signupConfirmPassword || !adminCode) {
+    if (!signupFirstName || !signupLastName || !signupEmail || !signupPassword || !signupConfirmPassword || !adminCode) {
       toast({
         title: "Missing Information",
         description: "Please fill in all fields",
@@ -284,8 +285,11 @@ export default function AdminAuth() {
 
     setIsLoading(true);
     try {
+      // Normalize email to lowercase
+      const normalizedEmail = signupEmail.trim().toLowerCase();
+
       // First validate the invite code
-      const validateResponse = await validateInvite({ code: adminCode, email: signupEmail });
+      const validateResponse = await validateInvite({ code: adminCode, email: normalizedEmail });
 
       if (!validateResponse.success) {
         toast({
@@ -297,17 +301,12 @@ export default function AdminAuth() {
         return;
       }
 
-      // Parse name into firstName and lastName
-      const nameParts = signupName.trim().split(" ");
-      const firstName = nameParts[0] || "";
-      const lastName = nameParts.slice(1).join(" ") || "";
-
       // Register the admin
       const response = await adminRegister({
-        email: signupEmail,
+        email: normalizedEmail,
         password: signupPassword,
-        firstName,
-        lastName,
+        firstName: signupFirstName.trim(),
+        lastName: signupLastName.trim(),
         inviteCode: adminCode,
       });
 
@@ -459,17 +458,29 @@ export default function AdminAuth() {
                     </Alert>
 
                     <form onSubmit={handleSignup} className="space-y-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="signup-name">Full Name</Label>
-                        <div className="relative">
-                          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <Label htmlFor="signup-firstname">First Name</Label>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="signup-firstname"
+                              type="text"
+                              placeholder="First name"
+                              className="pl-10"
+                              value={signupFirstName}
+                              onChange={(e) => setSignupFirstName(e.target.value)}
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="signup-lastname">Last Name</Label>
                           <Input
-                            id="signup-name"
+                            id="signup-lastname"
                             type="text"
-                            placeholder="Your full name"
-                            className="pl-10"
-                            value={signupName}
-                            onChange={(e) => setSignupName(e.target.value)}
+                            placeholder="Last name"
+                            value={signupLastName}
+                            onChange={(e) => setSignupLastName(e.target.value)}
                           />
                         </div>
                       </div>
