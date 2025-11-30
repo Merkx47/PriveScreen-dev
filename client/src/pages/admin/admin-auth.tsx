@@ -141,9 +141,10 @@ export default function AdminAuth() {
         });
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to connect to server. Please try again.";
       toast({
         title: "Login Failed",
-        description: "Unable to connect to server. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -234,9 +235,10 @@ export default function AdminAuth() {
         });
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to connect to server. Please try again.";
       toast({
         title: "Resend Failed",
-        description: "Unable to connect to server. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -325,9 +327,10 @@ export default function AdminAuth() {
         });
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unable to connect to server. Please try again.";
       toast({
         title: "Registration Failed",
-        description: "Unable to connect to server. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
