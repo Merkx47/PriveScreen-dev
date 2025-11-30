@@ -134,13 +134,16 @@ export async function verifyOtp(data: OtpVerifyRequest): Promise<ApiResponse<Adm
   if (response.success && response.data) {
     const { setAuthTokens } = await import('./config');
     setAuthTokens(response.data.accessToken, response.data.refreshToken);
+    // Backend sends adminAccessLevel, frontend type has accessLevel - handle both
+    const userAccessLevel = (response.data.user as unknown as { adminAccessLevel?: string }).adminAccessLevel || response.data.user.accessLevel;
     localStorage.setItem('authUser', JSON.stringify({
       id: response.data.user.id,
       email: response.data.user.email,
       name: `${response.data.user.firstName} ${response.data.user.lastName}`,
       role: 'admin',
       provider: 'email',
-      accessLevel: response.data.user.accessLevel,
+      accessLevel: userAccessLevel,
+      adminAccessLevel: userAccessLevel, // Used by dashboard for access control
     }));
   }
   return response;
