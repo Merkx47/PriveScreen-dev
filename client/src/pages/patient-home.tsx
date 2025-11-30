@@ -38,15 +38,26 @@ export default function PatientHome() {
   const [showActivateCode, setShowActivateCode] = useState(false);
   const [showRequestSponsor, setShowRequestSponsor] = useState(false);
 
-  // Check auth
+  // API queries
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+
+  // Check auth and role
   useEffect(() => {
     if (!getAuthToken()) {
       setLocation('/auth/patient');
+      return;
     }
-  }, [setLocation]);
-
-  // API queries
-  const { data: user, isLoading: userLoading } = useCurrentUser();
+    // Verify user role matches this portal
+    if (user && user.role !== 'patient') {
+      // Redirect to correct portal based on role
+      const roleRedirects: Record<string, string> = {
+        sponsor: '/sponsor',
+        center_owner: '/center',
+        admin: '/admin'
+      };
+      setLocation(roleRedirects[user.role] || '/auth/patient');
+    }
+  }, [setLocation, user]);
   const { data: wallet, isLoading: walletLoading } = useWallet();
   const { data: codes, isLoading: codesLoading } = useMyActiveCodes();
   const { data: resultsData, isLoading: resultsLoading } = useMyResults(0, 10);
@@ -58,7 +69,7 @@ export default function PatientHome() {
 
   const handleLogout = async () => {
     await logoutMutation.mutateAsync();
-    setLocation('/');
+    setLocation('/auth/patient');
   };
 
   // Format wallet balance

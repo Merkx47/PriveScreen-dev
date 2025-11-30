@@ -48,16 +48,27 @@ export default function SponsorHome() {
   const [showFundWallet, setShowFundWallet] = useState(false);
   const [declinedRequests, setDeclinedRequests] = useState<string[]>([]);
 
-  // Check auth on mount
+  // API hooks
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+
+  // Check auth and role
   useEffect(() => {
     const token = getAuthToken();
     if (!token) {
-      window.location.href = '/auth';
+      window.location.href = '/auth/sponsor';
+      return;
     }
-  }, []);
-
-  // API hooks
-  const { data: user, isLoading: userLoading } = useCurrentUser();
+    // Verify user role matches this portal (sponsor)
+    if (user && user.role !== 'sponsor') {
+      // Redirect to correct portal based on role
+      const roleRedirects: Record<string, string> = {
+        patient: '/patient',
+        center_owner: '/center',
+        admin: '/admin'
+      };
+      window.location.href = roleRedirects[user.role] || '/auth/sponsor';
+    }
+  }, [user]);
   const { data: wallet, isLoading: walletLoading } = useWallet();
   const { data: sponsorProfile, isLoading: profileLoading } = useSponsorProfile();
   const { data: testRequests, isLoading: requestsLoading } = useSponsorTestRequests(0, 50);
@@ -67,11 +78,11 @@ export default function SponsorHome() {
     logoutMutation.mutate(undefined, {
       onSuccess: () => {
         clearAuthTokens();
-        window.location.href = '/auth';
+        window.location.href = '/auth/sponsor';
       },
       onError: () => {
         clearAuthTokens();
-        window.location.href = '/auth';
+        window.location.href = '/auth/sponsor';
       }
     });
   };

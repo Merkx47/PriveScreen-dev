@@ -38,15 +38,26 @@ export default function CenterHome() {
   const [showPricing, setShowPricing] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
 
-  // Check auth
+  // API queries
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+
+  // Check auth and role
   useEffect(() => {
     if (!getAuthToken()) {
       setLocation('/auth/center');
+      return;
     }
-  }, [setLocation]);
-
-  // API queries
-  const { data: user, isLoading: userLoading } = useCurrentUser();
+    // Verify user role matches this portal (center_owner)
+    if (user && user.role !== 'center_owner') {
+      // Redirect to correct portal based on role
+      const roleRedirects: Record<string, string> = {
+        patient: '/patient',
+        sponsor: '/sponsor',
+        admin: '/admin'
+      };
+      setLocation(roleRedirects[user.role] || '/auth/center');
+    }
+  }, [setLocation, user]);
   const { data: center, isLoading: centerLoading } = useMyCenter();
   const { data: resultsData, isLoading: resultsLoading } = useCenterResults(0, 10);
   const logoutMutation = useLogout();
@@ -92,7 +103,7 @@ export default function CenterHome() {
 
   const handleLogout = async () => {
     await logoutMutation.mutateAsync();
-    setLocation('/');
+    setLocation('/auth/center');
   };
 
   const formatBalance = (balance: string) => {
