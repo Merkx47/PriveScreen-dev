@@ -486,7 +486,7 @@ export default function AdminDashboard() {
                   {isLoading ? (
                     <Skeleton className="h-8 w-24" />
                   ) : (
-                    <p className="text-2xl font-bold">₦{((parseFloat(stats?.totalPlatformBalance || "0")) / 1000000).toFixed(1)}M</p>
+                    <p className="text-2xl font-bold">₦{parseFloat(stats?.totalPlatformBalance || "0").toLocaleString()}</p>
                   )}
                 </div>
                 <Wallet className="h-8 w-8 text-amber-500" />
@@ -502,7 +502,7 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-3">
                 <Activity className="h-5 w-5 text-primary" />
                 <div>
-                  <p className="text-xs text-muted-foreground">New Users (30 days)</p>
+                  <p className="text-xs text-muted-foreground">New Patients (30 days)</p>
                   {isLoading ? <Skeleton className="h-5 w-8" /> : <p className="font-bold">{stats?.newPatientsLastMonth || 0}</p>}
                 </div>
               </div>
