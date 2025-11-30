@@ -49,28 +49,13 @@ function AdminRouter() {
   );
 }
 
-// Redirect component for admin routes on main domain
-function AdminRedirect({ path }: { path: string }) {
-  const hostname = typeof window !== 'undefined' ? window.location.hostname : '';
-  const protocol = typeof window !== 'undefined' ? window.location.protocol : 'https:';
-
-  // Local development - just show the page
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    if (path === '/admin/auth' || path === '/admin/login') {
-      return <AdminAuth />;
-    }
-    return <AdminDashboard />;
+// Admin component - serves admin pages directly (no subdomain redirect)
+// Since Amplify doesn't have admin subdomain configured, serve admin on main domain
+function AdminPage({ path }: { path: string }) {
+  if (path === '/admin/auth' || path === '/admin/login') {
+    return <AdminAuth />;
   }
-
-  // Production - redirect to admin subdomain
-  const baseDomain = hostname.replace(/^www\./, '');
-  const adminUrl = `${protocol}//admin.${baseDomain}${path.replace('/admin', '') || '/'}`;
-
-  if (typeof window !== 'undefined') {
-    window.location.href = adminUrl;
-  }
-
-  return null;
+  return <AdminDashboard />;
 }
 
 // Main app router for privescreen.com
@@ -100,18 +85,18 @@ function MainRouter() {
       <Route path="/sponsor-request/:code" component={SponsorRequest} />
       <Route path="/verify-email" component={VerifyEmail} />
       <Route path="/reset-password" component={ResetPassword} />
-      {/* Admin routes - work on localhost, redirect to admin subdomain in production */}
+      {/* Admin routes - serve directly on main domain */}
       <Route path="/admin/login">
-        <AdminRedirect path="/admin/login" />
+        <AdminPage path="/admin/login" />
       </Route>
       <Route path="/admin/dashboard">
-        <AdminRedirect path="/admin/dashboard" />
+        <AdminPage path="/admin/dashboard" />
       </Route>
       <Route path="/admin/auth">
-        <AdminRedirect path="/admin/auth" />
+        <AdminPage path="/admin/auth" />
       </Route>
       <Route path="/admin">
-        <AdminRedirect path="/admin" />
+        <AdminPage path="/admin" />
       </Route>
       <Route component={NotFound} />
     </Switch>
