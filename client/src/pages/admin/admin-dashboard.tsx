@@ -82,7 +82,7 @@ interface DashboardStats {
   totalPlatformBalance: string;
 }
 
-type Tab = "overview" | "revenue" | "patients" | "centers" | "sponsors" | "logs";
+type Tab = "overview" | "revenue" | "patients" | "centers" | "sponsors" | "admins" | "logs";
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -110,6 +110,7 @@ export default function AdminDashboard() {
   const [sponsors, setSponsors] = useState<SponsorListItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [pendingCenters, setPendingCenters] = useState<CenterListItem[]>([]);
+  const [adminUsers, setAdminUsers] = useState<UserListItem[]>([]);
 
   // Auth check - must be before any conditional returns but after all hooks
   useEffect(() => {
@@ -133,13 +134,14 @@ export default function AdminDashboard() {
     setIsLoading(true);
     setError(null);
     try {
-      const [statsRes, usersRes, centersRes, sponsorsRes, logsRes, pendingCentersRes] = await Promise.all([
+      const [statsRes, usersRes, centersRes, sponsorsRes, logsRes, pendingCentersRes, adminsRes] = await Promise.all([
         getDashboardStats(),
         getUsers("patient", 0, 20),
         getCenters(undefined, 0, 20),
         getSponsors(undefined, 0, 20),
         getAuditLogs(undefined, undefined, 0, 20),
         getCenters("pending", 0, 10),
+        getUsers("admin", 0, 20),
       ]);
 
       if (statsRes.success && statsRes.data) {
@@ -159,6 +161,9 @@ export default function AdminDashboard() {
       }
       if (pendingCentersRes.success && pendingCentersRes.data) {
         setPendingCenters(pendingCentersRes.data.content || []);
+      }
+      if (adminsRes.success && adminsRes.data) {
+        setAdminUsers(adminsRes.data.content || []);
       }
     } catch (err) {
       console.error("Failed to fetch dashboard data:", err);
@@ -507,13 +512,14 @@ export default function AdminDashboard() {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as Tab)} className="space-y-4">
-          <TabsList className="grid grid-cols-6 w-full max-w-3xl">
+          <TabsList className="grid grid-cols-7 w-full max-w-4xl">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="revenue">Revenue</TabsTrigger>
             <TabsTrigger value="patients">Patients</TabsTrigger>
             <TabsTrigger value="centers">Centers</TabsTrigger>
             <TabsTrigger value="sponsors">Sponsors</TabsTrigger>
-            <TabsTrigger value="logs">Audit Logs</TabsTrigger>
+            <TabsTrigger value="admins">Admins</TabsTrigger>
+            <TabsTrigger value="logs">Logs</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -1028,6 +1034,114 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Admins Tab */}
+          <TabsContent value="admins" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Admin Users</CardTitle>
+                    <CardDescription>Manage administrator accounts</CardDescription>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={fetchDashboardData} disabled={isLoading}>
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="flex items-center justify-between py-3 border-b">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-10 w-10 rounded-full" />
+                          <div>
+                            <Skeleton className="h-4 w-32 mb-1" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                        </div>
+                        <Skeleton className="h-6 w-20" />
+                      </div>
+                    ))}
+                  </div>
+                ) : adminUsers.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Shield className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                    <p className="mt-2 text-sm text-muted-foreground">No admin users found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {adminUsers.map((admin) => {
+                      const currentUser = JSON.parse(localStorage.getItem("authUser") || "{}");
+                      const isSuperAdmin = currentUser.adminAccessLevel === "super_admin";
+                      const isCurrentUser = admin.id === currentUser.id;
+
+                      return (
+                        <div key={admin.id} className="flex items-center justify-between py-3 border-b last:border-0">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <Shield className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                              <p className="font-medium">{admin.firstName} {admin.lastName}</p>
+                              <p className="text-sm text-muted-foreground">{admin.email}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={
+                              admin.adminAccessLevel === "super_admin" ? "default" :
+                              admin.adminAccessLevel === "editor" ? "secondary" : "outline"
+                            }>
+                              {admin.adminAccessLevel === "super_admin" ? (
+                                <><Crown className="h-3 w-3 mr-1" /> Super Admin</>
+                              ) : admin.adminAccessLevel === "editor" ? (
+                                "Editor"
+                              ) : (
+                                "Read Only"
+                              )}
+                            </Badge>
+                            {admin.suspended ? (
+                              <Badge variant="destructive">Suspended</Badge>
+                            ) : (
+                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Active</Badge>
+                            )}
+                            {isSuperAdmin && !isCurrentUser && (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {admin.suspended ? (
+                                    <DropdownMenuItem onClick={() => handleUserStatusChange(admin.id, "unsuspend")}>
+                                      <UserCheck className="h-4 w-4 mr-2" />
+                                      Unsuspend
+                                    </DropdownMenuItem>
+                                  ) : (
+                                    <DropdownMenuItem onClick={() => handleUserStatusChange(admin.id, "suspend")} className="text-destructive">
+                                      <UserX className="h-4 w-4 mr-2" />
+                                      Suspend
+                                    </DropdownMenuItem>
+                                  )}
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </CardContent>

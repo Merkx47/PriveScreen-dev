@@ -46,6 +46,7 @@ export interface UserListItem {
   firstName: string;
   lastName: string;
   role: 'patient' | 'center' | 'sponsor' | 'admin';
+  adminAccessLevel?: 'super_admin' | 'editor' | 'read_only';
   emailVerified: boolean;
   suspended: boolean;
   suspendedReason?: string;
