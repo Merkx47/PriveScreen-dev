@@ -703,7 +703,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Prime Subscriptions</p>
-                      <p className="text-2xl font-bold">₦0.00M</p>
+                      <p className="text-2xl font-bold">₦0</p>
                     </div>
                     <Crown className="h-8 w-8 text-amber-500" />
                   </div>
@@ -715,7 +715,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Test Commissions</p>
-                      <p className="text-2xl font-bold">₦0.00M</p>
+                      <p className="text-2xl font-bold">₦0</p>
                     </div>
                     <FileText className="h-8 w-8 text-blue-500" />
                   </div>
