@@ -16,12 +16,12 @@ export function PriveScreenLogo({ className = "", size = 32 }: LogoProps) {
       {/* Heart-Shield hybrid shape */}
       <defs>
         <linearGradient id="shieldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#22c55e" stopOpacity="1" />
-          <stop offset="100%" stopColor="#16a34a" stopOpacity="1" />
+          <stop offset="0%" stopColor="#ef4444" stopOpacity="1" />
+          <stop offset="100%" stopColor="#dc2626" stopOpacity="1" />
         </linearGradient>
         <linearGradient id="lockGrad" x1="0%" y1="0%" x2="0%" y2="100%">
           <stop offset="0%" stopColor="#ffffff" stopOpacity="1" />
-          <stop offset="100%" stopColor="#dcfce7" stopOpacity="1" />
+          <stop offset="100%" stopColor="#fee2e2" stopOpacity="1" />
         </linearGradient>
       </defs>
 
@@ -36,7 +36,7 @@ export function PriveScreenLogo({ className = "", size = 32 }: LogoProps) {
            C48 8 40 4 32 4
            Z"
         fill="url(#shieldGrad)"
-        stroke="#15803d"
+        stroke="#b91c1c"
         strokeWidth="1.5"
       />
 
@@ -55,8 +55,8 @@ export function PriveScreenLogo({ className = "", size = 32 }: LogoProps) {
       />
 
       {/* Keyhole/Lock element */}
-      <circle cx="32" cy="28" r="4" fill="#16a34a"/>
-      <path d="M30 30 L30 38 L34 38 L34 30 Z" fill="#16a34a"/>
+      <circle cx="32" cy="28" r="4" fill="#dc2626"/>
+      <path d="M30 30 L30 38 L34 38 L34 30 Z" fill="#dc2626"/>
     </svg>
   );
 }
