@@ -687,7 +687,7 @@ export default function AdminDashboard() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-sm text-muted-foreground">Platform Balance</p>
-                      <p className="text-2xl font-bold">₦{((parseFloat(stats?.totalPlatformBalance || "0")) / 1000000).toFixed(2)}M</p>
+                      <p className="text-2xl font-bold">₦{parseFloat(stats?.totalPlatformBalance || "0").toLocaleString()}</p>
                     </div>
                     <Wallet className="h-8 w-8 text-primary" />
                   </div>
