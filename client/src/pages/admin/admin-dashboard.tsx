@@ -75,8 +75,8 @@ import {
 
 // Stats interface matching backend response
 interface DashboardStats {
-  totalUsers: number;
-  newUsersLastMonth: number;
+  totalPatients: number;
+  newPatientsLastMonth: number;
   activeSubscriptions: number;
   openTickets: number;
   totalPlatformBalance: string;
@@ -398,11 +398,11 @@ export default function AdminDashboard() {
             <CardContent className="pt-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Total Users</p>
+                  <p className="text-sm text-muted-foreground">Total Patients</p>
                   {isLoading ? (
                     <Skeleton className="h-8 w-20" />
                   ) : (
-                    <p className="text-2xl font-bold">{(stats?.totalUsers || 0).toLocaleString()}</p>
+                    <p className="text-2xl font-bold">{(stats?.totalPatients || 0).toLocaleString()}</p>
                   )}
                 </div>
                 <Users className="h-8 w-8 text-blue-500" />
@@ -467,7 +467,7 @@ export default function AdminDashboard() {
                 <Activity className="h-5 w-5 text-primary" />
                 <div>
                   <p className="text-xs text-muted-foreground">New Users (30 days)</p>
-                  {isLoading ? <Skeleton className="h-5 w-8" /> : <p className="font-bold">{stats?.newUsersLastMonth || 0}</p>}
+                  {isLoading ? <Skeleton className="h-5 w-8" /> : <p className="font-bold">{stats?.newPatientsLastMonth || 0}</p>}
                 </div>
               </div>
             </CardContent>
