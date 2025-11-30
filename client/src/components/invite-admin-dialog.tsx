@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ADMIN_ACCESS_LEVELS, type AdminAccessLevel } from "@shared/schema";
+import { createInvite } from "@/lib/api/admin";
 
 interface InviteAdminDialogProps {
   open: boolean;
@@ -40,17 +41,6 @@ interface InviteAdminDialogProps {
 }
 
 type Step = "form" | "success";
-
-// Generate a random invite code
-const generateInviteCode = () => {
-  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-  let code = "";
-  for (let i = 0; i < 12; i++) {
-    if (i > 0 && i % 4 === 0) code += "-";
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-};
 
 export function InviteAdminDialog({ open, onOpenChange }: InviteAdminDialogProps) {
   const { toast } = useToast();
@@ -114,22 +104,45 @@ export function InviteAdminDialog({ open, onOpenChange }: InviteAdminDialogProps
 
     setIsLoading(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      // Call the actual API to create the invite
+      const response = await createInvite({
+        email,
+        accessLevel,
+        expiryDays: parseInt(expiryDays),
+        notes: notes || undefined,
+      });
 
-    // Generate invite code and link
-    const code = generateInviteCode();
-    const link = `${window.location.origin}/admin/auth?invite=${code}`;
+      if (response.success && response.data) {
+        // Use the code from the backend response
+        const code = response.data.code;
+        const link = `${window.location.origin}/admin/auth?invite=${code}`;
 
-    setGeneratedCode(code);
-    setInviteLink(link);
-    setStep("success");
-    setIsLoading(false);
+        setGeneratedCode(code);
+        setInviteLink(link);
+        setStep("success");
 
-    toast({
-      title: "Invite Created",
-      description: `Admin invite sent to ${email}`,
-    });
+        toast({
+          title: "Invite Created",
+          description: `Admin invite created for ${email}`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: response.message || "Failed to create invite",
+          variant: "destructive",
+        });
+      }
+    } catch (error: any) {
+      console.error("Failed to create invite:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create invite. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleCopy = (text: string, label: string) => {
@@ -137,17 +150,6 @@ export function InviteAdminDialog({ open, onOpenChange }: InviteAdminDialogProps
     toast({
       title: "Copied!",
       description: `${label} copied to clipboard`,
-    });
-  };
-
-  const handleSendEmail = async () => {
-    setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
-
-    toast({
-      title: "Email Sent",
-      description: `Invite email sent to ${email}`,
     });
   };
 
@@ -357,23 +359,20 @@ export function InviteAdminDialog({ open, onOpenChange }: InviteAdminDialogProps
               <span className="text-sm font-medium">{expiryDays} days</span>
             </div>
 
-            <div className="flex gap-2 pt-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleSendEmail}
-                disabled={isLoading}
-              >
-                <Mail className="h-4 w-4 mr-2" />
-                {isLoading ? "Sending..." : "Send Email"}
-              </Button>
-              <Button
-                className="flex-1"
-                onClick={() => handleClose(false)}
-              >
-                Done
-              </Button>
+            {/* Email status indicator */}
+            <div className="flex items-center justify-center gap-2 p-3 border rounded-lg bg-green-50 dark:bg-green-950/20">
+              <CheckCircle2 className="h-4 w-4 text-green-600" />
+              <span className="text-sm text-green-700 dark:text-green-300">
+                Invite email sent to {email}
+              </span>
             </div>
+
+            <Button
+              className="w-full"
+              onClick={() => handleClose(false)}
+            >
+              Done
+            </Button>
 
             <Alert className="border-amber-200 bg-amber-50 dark:bg-amber-950/20">
               <Shield className="h-4 w-4 text-amber-600" />
