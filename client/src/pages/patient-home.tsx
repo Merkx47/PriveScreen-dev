@@ -112,7 +112,7 @@ export default function PatientHome() {
             <Skeleton className="h-10 w-64 mb-2" />
           ) : (
             <h2 className="text-3xl font-semibold mb-2">
-              Welcome back, {user?.firstName || 'Patient'}
+              Welcome back, {user?.firstName || user?.email?.split('@')[0] || 'there'}
             </h2>
           )}
           <p className="text-muted-foreground">Your private sexual health dashboard</p>
