@@ -100,7 +100,9 @@ export async function apiFetch<T>(
     let errorMessage = 'An error occurred';
     try {
       const errorJson = JSON.parse(errorText);
-      errorMessage = errorJson.message || errorMessage;
+      // Backend returns ApiResponse with error.message format
+      // Structure: { success: false, error: { code: "...", message: "..." } }
+      errorMessage = errorJson.error?.message || errorJson.message || errorMessage;
     } catch {
       errorMessage = errorText || response.statusText;
     }
