@@ -70,10 +70,14 @@ export async function login(data: LoginRequest): Promise<ApiResponse<AuthRespons
   const response = await apiPost<AuthResponse>('/api/auth/login', data);
   if (response.success && response.data) {
     setAuthTokens(response.data.accessToken, response.data.refreshToken);
+    // Build name from firstName and lastName, with fallback
+    const firstName = response.data.user.firstName || '';
+    const lastName = response.data.user.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim() || 'User';
     localStorage.setItem('authUser', JSON.stringify({
       id: response.data.user.id,
       email: response.data.user.email,
-      name: `${response.data.user.firstName} ${response.data.user.lastName}`,
+      name: fullName,
       phone: response.data.user.phone,
       role: response.data.user.role,
       provider: 'email',
@@ -105,10 +109,13 @@ export async function googleAuth(data: GoogleAuthRequest): Promise<ApiResponse<A
   const response = await apiPost<AuthResponse & { isNewUser: boolean }>('/api/auth/oauth/google', data);
   if (response.success && response.data) {
     setAuthTokens(response.data.accessToken, response.data.refreshToken);
+    const firstName = response.data.user.firstName || '';
+    const lastName = response.data.user.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim() || 'User';
     localStorage.setItem('authUser', JSON.stringify({
       id: response.data.user.id,
       email: response.data.user.email,
-      name: `${response.data.user.firstName} ${response.data.user.lastName}`,
+      name: fullName,
       phone: response.data.user.phone,
       role: response.data.user.role,
       provider: 'google',
@@ -122,10 +129,13 @@ export async function microsoftAuth(data: MicrosoftAuthRequest): Promise<ApiResp
   const response = await apiPost<AuthResponse & { isNewUser: boolean }>('/api/auth/oauth/microsoft', data);
   if (response.success && response.data) {
     setAuthTokens(response.data.accessToken, response.data.refreshToken);
+    const firstName = response.data.user.firstName || '';
+    const lastName = response.data.user.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim() || 'User';
     localStorage.setItem('authUser', JSON.stringify({
       id: response.data.user.id,
       email: response.data.user.email,
-      name: `${response.data.user.firstName} ${response.data.user.lastName}`,
+      name: fullName,
       phone: response.data.user.phone,
       role: response.data.user.role,
       provider: 'microsoft',
@@ -139,10 +149,13 @@ export async function appleAuth(data: AppleAuthRequest): Promise<ApiResponse<Aut
   const response = await apiPost<AuthResponse & { isNewUser: boolean }>('/api/auth/oauth/apple', data);
   if (response.success && response.data) {
     setAuthTokens(response.data.accessToken, response.data.refreshToken);
+    const firstName = response.data.user.firstName || '';
+    const lastName = response.data.user.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim() || 'User';
     localStorage.setItem('authUser', JSON.stringify({
       id: response.data.user.id,
       email: response.data.user.email,
-      name: `${response.data.user.firstName} ${response.data.user.lastName}`,
+      name: fullName,
       phone: response.data.user.phone,
       role: response.data.user.role,
       provider: 'apple',
@@ -185,10 +198,14 @@ export async function verifyEmail(token: string): Promise<ApiResponse<AuthRespon
   const response = await apiGet<AuthResponse>(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
   if (response.success && response.data) {
     setAuthTokens(response.data.accessToken, response.data.refreshToken);
+    // Build name from firstName and lastName, with fallback
+    const firstName = response.data.user.firstName || '';
+    const lastName = response.data.user.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim() || 'User';
     localStorage.setItem('authUser', JSON.stringify({
       id: response.data.user.id,
       email: response.data.user.email,
-      name: `${response.data.user.firstName} ${response.data.user.lastName}`,
+      name: fullName,
       phone: response.data.user.phone,
       role: response.data.user.role,
       provider: 'email',

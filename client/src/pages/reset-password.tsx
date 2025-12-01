@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { ArrowLeft, Lock, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Lock, CheckCircle, AlertCircle, Loader2, Eye, EyeOff } from "lucide-react";
 import { PriveScreenLogo } from "@/components/logo";
 import { useToast } from "@/hooks/use-toast";
 import { validateResetToken, resetPassword } from "@/lib/api/auth";
@@ -22,6 +22,8 @@ export default function ResetPassword() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [token, setToken] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Extract token from URL
   useEffect(() => {
@@ -172,14 +174,21 @@ export default function ResetPassword() {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="new-password"
-                          type="password"
+                          type={showNewPassword ? "text" : "password"}
                           placeholder="Enter new password (min 8 chars)"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                           required
                           minLength={8}
                         />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
@@ -189,13 +198,20 @@ export default function ResetPassword() {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="confirm-password"
-                          type="password"
+                          type={showConfirmPassword ? "text" : "password"}
                           placeholder="Confirm your password"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                           required
                         />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 

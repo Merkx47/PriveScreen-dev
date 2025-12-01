@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Shield, Lock, Mail, User, AlertCircle, KeyRound, ArrowLeft, RefreshCw, CheckCircle } from "lucide-react";
+import { Shield, Lock, Mail, User, AlertCircle, KeyRound, ArrowLeft, RefreshCw, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { PriveScreenLogo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useToast } from "@/hooks/use-toast";
@@ -41,6 +41,11 @@ export default function AdminAuth() {
 
   // Registration success state
   const [registeredEmail, setRegisteredEmail] = useState("");
+
+  // Password visibility state
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // OTP countdown timer
   useEffect(() => {
@@ -434,12 +439,19 @@ export default function AdminAuth() {
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
                             id="login-password"
-                            type="password"
+                            type={showLoginPassword ? "text" : "password"}
                             placeholder="Enter your password"
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             value={loginPassword}
                             onChange={(e) => setLoginPassword(e.target.value)}
                           />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowLoginPassword(!showLoginPassword)}
+                          >
+                            {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
                         </div>
                       </div>
 
@@ -506,12 +518,19 @@ export default function AdminAuth() {
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
                             id="signup-password"
-                            type="password"
+                            type={showSignupPassword ? "text" : "password"}
                             placeholder="Create a password"
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             value={signupPassword}
                             onChange={(e) => setSignupPassword(e.target.value)}
                           />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowSignupPassword(!showSignupPassword)}
+                          >
+                            {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
                         </div>
                       </div>
 
@@ -521,12 +540,19 @@ export default function AdminAuth() {
                           <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                           <Input
                             id="signup-confirm"
-                            type="password"
+                            type={showConfirmPassword ? "text" : "password"}
                             placeholder="Confirm your password"
-                            className="pl-10"
+                            className="pl-10 pr-10"
                             value={signupConfirmPassword}
                             onChange={(e) => setSignupConfirmPassword(e.target.value)}
                           />
+                          <button
+                            type="button"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          >
+                            {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
                         </div>
                       </div>
 

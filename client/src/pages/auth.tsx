@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Mail, Lock, User, Phone, Building2, CheckCircle } from "lucide-react";
+import { ArrowLeft, Mail, Lock, User, Phone, Building2, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { CenterOnboardingDialog } from "@/components/center-onboarding-dialog";
 import { PriveScreenLogo } from "@/components/logo";
@@ -90,6 +90,11 @@ export default function Auth({ portalType }: AuthPageProps) {
   const [signupPhone, setSignupPhone] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
   const [signupConfirmPassword, setSignupConfirmPassword] = useState("");
+
+  // Password visibility state
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const config = portalConfig[portalType];
 
@@ -506,13 +511,20 @@ export default function Auth({ portalType }: AuthPageProps) {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="login-password"
-                          type="password"
+                          type={showLoginPassword ? "text" : "password"}
                           placeholder="Enter your password"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           value={loginPassword}
                           onChange={(e) => setLoginPassword(e.target.value)}
                           required
                         />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        >
+                          {showLoginPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
@@ -605,14 +617,21 @@ export default function Auth({ portalType }: AuthPageProps) {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="signup-password"
-                          type="password"
+                          type={showSignupPassword ? "text" : "password"}
                           placeholder="Create a password (min 8 chars)"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           value={signupPassword}
                           onChange={(e) => setSignupPassword(e.target.value)}
                           required
                           minLength={8}
                         />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowSignupPassword(!showSignupPassword)}
+                        >
+                          {showSignupPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
@@ -622,13 +641,20 @@ export default function Auth({ portalType }: AuthPageProps) {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="signup-confirm"
-                          type="password"
+                          type={showConfirmPassword ? "text" : "password"}
                           placeholder="Confirm your password"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           value={signupConfirmPassword}
                           onChange={(e) => setSignupConfirmPassword(e.target.value)}
                           required
                         />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
